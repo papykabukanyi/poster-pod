@@ -1,0 +1,49 @@
+# Python files
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.env
+.env
+
+# Configuration files
+config.py
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# Virtual environments
+venv/
+env/
+
+# Static cache and build files
+static/cache/
+static/*.map
+
+# Ignore compiled CSS (if you're using a preprocessor like SCSS or LESS)
+*.sass-cache/
+*.scss-cache/
+*.css.map
+
+# Node.js dependencies (if any)
+node_modules/
+
+# Secrets
+*.key
+*.crt
+*.pem
+*.json
+
+# IDE and editor settings
+.idea/
+.vscode/
+*.code-workspace
+*.sublime-*

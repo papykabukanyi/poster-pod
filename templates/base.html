@@ -1,15 +1,54 @@
-<!-- templates/base.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Discover and listen to fascinating podcasts for free on Poster Podcast. Explore diverse topics, connect with your interests, and enjoy a seamless listening experience.">
+    <meta name="keywords" content="Podcast, Free Podcasts, Interesting Podcasts, Audio, Listen, Poster Podcast, Mobile App">
+    <meta name="author" content="Poster Podcast Team">
+
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Poster Podcast - Free Podcast Listening">
+    <meta property="og:description" content="Discover and enjoy free podcasts on Poster Podcast. Dive into captivating topics anytime, anywhere.">
+    <meta property="og:image" content="/static/images/og-image.jpg">
+    <meta property="og:url" content="https://poster-pod.up.railway.app">
+    <meta property="og:type" content="website">
+
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Poster Podcast - Free Podcast Listening">
+    <meta name="twitter:description" content="Discover and enjoy free podcasts on Poster Podcast. Explore fascinating topics today!">
+    <meta name="twitter:image" content="/static/images/twitter-image.jpg">
+    
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Poster Podcast",
+        "url": "https://poster-pod.up.railway.app",
+        "description": "A web and mobile app for free podcast listening across fascinating topics.",
+        "applicationCategory": "Entertainment",
+        "operatingSystem": "Web, iOS, Android",
+        "publisher": {
+            "@type": "Organization",
+            "name": "Poster Podcast"
+        }
+    }
+    </script>
+
     <!-- Favicon -->
     <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
     <link rel="manifest" href="/static/site.webmanifest">
-    <title>Poster Podcast</title>
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://poster-pod.up.railway.app">
+
+    <title>Poster Podcast | Free and Fascinating Podcasts</title>
+    
+    <!-- Styles and Scripts -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.2/plyr.css">
     <link rel="stylesheet" href="/static/css/styles.css">

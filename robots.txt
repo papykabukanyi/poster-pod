@@ -1,0 +1,11 @@
+# Allow all web crawlers to access the site
+User-agent: *
+Allow: /
+
+# Disallow access to admin and temporary files
+Disallow: /admin/
+Disallow: /tmp/
+Disallow: /private/
+
+# Specify the location of the sitemap
+Sitemap: https://poster-pod.up.railway.app/sitemap.xml

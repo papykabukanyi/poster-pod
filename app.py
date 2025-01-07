@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, abort
 import cloudinary
 import cloudinary.uploader
 import os
@@ -16,8 +16,8 @@ app.config.from_object('config')
 # Initialize SQLAlchemy with the new style
 engine = create_engine(SQLALCHEMY_DATABASE_URI)
 db_session = scoped_session(sessionmaker(autocommit=False,
-                                       autoflush=False,
-                                       bind=engine))
+                                         autoflush=False,
+                                         bind=engine))
 
 Base = declarative_base()
 Base.query = db_session.query_property()
@@ -73,7 +73,11 @@ def admin():
 
 @app.route('/like/<int:podcast_id>', methods=['POST'])
 def like_podcast(podcast_id):
-    podcast = Podcast.query.get_or_404(podcast_id)
+    # Manual implementation of get_or_404
+    podcast = db_session.query(Podcast).filter_by(id=podcast_id).first()
+    if podcast is None:
+        abort(404)  # Return 404 error if podcast not found
+
     podcast.likes += 1
     db_session.commit()
     return jsonify({'likes': podcast.likes})
@@ -115,6 +119,11 @@ def upload_podcast():
     
     return jsonify({'error': 'Invalid file type'}), 400
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'healthy'}), 200
+
 if __name__ == '__main__':
     init_db()  # Initialize the database before running the app
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 3030))
+    app.run(host='0.0.0.0', port=port)
