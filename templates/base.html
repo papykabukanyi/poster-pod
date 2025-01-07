@@ -1,3 +1,4 @@
+<!-- templates/base.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,13 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Podcast App</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/plyr@3/dist/plyr.css">
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.2/plyr.css">
     <link rel="stylesheet" href="/static/css/styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/plyr@3/dist/plyr.js"></script>
+    <script src="https://cdn.plyr.io/3.7.2/plyr.js"></script>
 </head>
-<body class="bg-gray-100">
+<body style="background-color: #A4A5A6;">
     {% block content %}{% endblock %}
-
     <script src="/static/js/player.js"></script>
 </body>
 </html>

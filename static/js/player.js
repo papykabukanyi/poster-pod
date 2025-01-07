@@ -33,6 +33,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// Handle like functionality
+async function likePodcast(podcastId) {
+    try {
+        const response = await fetch(`/like/${podcastId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const likeBtn = document.querySelector(`[onclick="likePodcast(${podcastId})"]`);
+            const likesCount = likeBtn.querySelector('.likes-count');
+            likesCount.textContent = data.likes;
+            
+            // Add visual feedback
+            likeBtn.classList.add('text-red-500');
+            setTimeout(() => {
+                likeBtn.classList.remove('text-red-500');
+            }, 200);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
 // Handle file upload with drag and drop
 document.addEventListener('DOMContentLoaded', () => {
     const uploadForm = document.getElementById('uploadForm');
@@ -152,4 +179,23 @@ document.addEventListener('keydown', (e) => {
                 break;
         }
     }
+});
+
+// Add progress tracking for audio playback
+document.addEventListener('DOMContentLoaded', () => {
+    const players = document.querySelectorAll('.plyr');
+    
+    players.forEach(player => {
+        const progressBar = document.createElement('div');
+        progressBar.className = 'progress-bar mt-2';
+        const progressFill = document.createElement('div');
+        progressFill.className = 'progress-bar-fill';
+        progressBar.appendChild(progressFill);
+        player.parentElement.appendChild(progressBar);
+
+        player.addEventListener('timeupdate', () => {
+            const progress = (player.currentTime / player.duration) * 100;
+            progressFill.style.width = `${progress}%`;
+        });
+    });
 });

@@ -1,11 +1,12 @@
+<!-- templates/admin.html -->
 {% extends "base.html" %}
 
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <h1 class="text-4xl font-bold text-gray-900 mb-8">Poster</h1>
+    <h1 class="text-4xl font-bold text-black mb-8">Podcast Upload</h1>
     
     <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <h2 class="text-2l font-semibold mb-4">Upload New Podcast</h2>
+        <h2 class="text-2xl font-semibold mb-4">Upload New Podcast</h2>
         
         <form id="uploadForm" class="space-y-6">
             <div>
@@ -21,8 +22,8 @@
             </div>
             
             <div>
-                <label class="block text-sm font-medium text-gray-700">Audio File</label>
-                <input type="file" name="audio" accept="audio/*" required
+                <label class="block text-sm font-medium text-gray-700">Audio File (MP3 or WAV)</label>
+                <input type="file" name="audio" accept=".mp3,.wav" required
                     class="mt-1 block w-full">
             </div>
             
@@ -32,45 +33,5 @@
             </button>
         </form>
     </div>
-    
-    <div class="bg-white rounded-lg shadow-lg p-6">
-        <h2 class="text-2l font-semibold mb-4">Uploaded Podcasts</h2>
-        
-        <div class="space-y-4">
-            {% for podcast in podcasts %}
-            <div class="border-b border-gray-200 pb-4">
-                <h3 class="text-lg font-medium">{{ podcast.title }}</h3>
-                <p class="text-gray-600">{{ podcast.description }}</p>
-                <audio controls class="mt-2 w-full">
-                    <source src="{{ podcast.url }}" type="audio/mp3">
-                </audio>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
 </div>
-
-<script>
-document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const formData = new FormData(e.target);
-    
-    try {
-        const response = await fetch('/upload', {
-            method: 'POST',
-            body: formData
-        });
-        
-        if (response.ok) {
-            window.location.reload();
-        } else {
-            alert('Upload failed. Please try again.');
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Upload failed. Please try again.');
-    }
-});
-</script>
 {% endblock %}
