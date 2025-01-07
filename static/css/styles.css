@@ -1,0 +1,91 @@
+/* Custom styles for the podcast player */
+.audio-player {
+    --plyr-color-main: #4f46e5;
+    --plyr-audio-controls-background: #f3f4f6;
+    --plyr-audio-control-color: #374151;
+    --plyr-audio-control-color-hover: #4f46e5;
+}
+
+.plyr--audio .plyr__controls {
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+}
+
+/* Custom scrollbar for podcast list */
+.podcast-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.podcast-list::-webkit-scrollbar-track {
+    background: #f3f4f6;
+}
+
+.podcast-list::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 3px;
+}
+
+/* Loading animation for upload */
+.loading {
+    position: relative;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    width: 1.25rem;
+    height: 1.25rem;
+    top: 50%;
+    left: 50%;
+    margin: -0.625rem 0 0 -0.625rem;
+    border: 2px solid #e5e7eb;
+    border-top-color: #4f46e5;
+    border-radius: 50%;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .plyr--audio .plyr__controls {
+        padding: 0.5rem;
+    }
+    
+    .audio-player {
+        margin: 0 -1rem;
+    }
+}
+
+/* Custom styles for the upload form */
+.upload-zone {
+    border: 2px dashed #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.upload-zone.dragover {
+    border-color: #4f46e5;
+    background-color: #eef2ff;
+}
+
+/* Progress bar styles */
+.progress-bar {
+    width: 100%;
+    height: 0.5rem;
+    background-color: #e5e7eb;
+    border-radius: 0.25rem;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background-color: #4f46e5;
+    transition: width 0.3s ease;
+}

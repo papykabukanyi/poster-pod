@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <h1 class="text-4xl font-bold text-gray-900 mb-8">Poster</h1>
+    
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+        <h2 class="text-2l font-semibold mb-4">Upload New Podcast</h2>
+        
+        <form id="uploadForm" class="space-y-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Title</label>
+                <input type="text" name="title" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Description</label>
+                <textarea name="description" rows="3"
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Audio File</label>
+                <input type="file" name="audio" accept="audio/*" required
+                    class="mt-1 block w-full">
+            </div>
+            
+            <button type="submit"
+                class="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                Upload Podcast
+            </button>
+        </form>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-2l font-semibold mb-4">Uploaded Podcasts</h2>
+        
+        <div class="space-y-4">
+            {% for podcast in podcasts %}
+            <div class="border-b border-gray-200 pb-4">
+                <h3 class="text-lg font-medium">{{ podcast.title }}</h3>
+                <p class="text-gray-600">{{ podcast.description }}</p>
+                <audio controls class="mt-2 w-full">
+                    <source src="{{ podcast.url }}" type="audio/mp3">
+                </audio>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    
+    try {
+        const response = await fetch('/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            alert('Upload failed. Please try again.');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Upload failed. Please try again.');
+    }
+});
+</script>
+{% endblock %}
