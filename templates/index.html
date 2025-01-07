@@ -2,25 +2,49 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="mx-auto max-w-screen-xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-    <h2 class="text-center text-4xl font-bold tracking-tight text-black mb-8">
-        Poster Podcasts
-    </h2>
+<!-- Preloader -->
+<div id="preloader" class="fixed inset-0 bg-black z-50 flex items-center justify-center">
+    <div class="text-white text-6xl font-bold tracking-wider">
+        <span class="animate-letter" style="--delay: 0s">F</span>
+        <span class="animate-letter" style="--delay: 0.2s">r</span>
+        <span class="animate-letter" style="--delay: 0.4s">e</span>
+        <span class="animate-letter" style="--delay: 0.6s">e</span>
+        <span class="animate-letter" style="--delay: 0.8s"> </span>
+        <span class="animate-letter" style="--delay: 1.0s">P</span>
+        <span class="animate-letter" style="--delay: 1.2s">o</span>
+        <span class="animate-letter" style="--delay: 1.4s">s</span>
+        <span class="animate-letter" style="--delay: 1.6s">t</span>
+        <span class="animate-letter" style="--delay: 1.8s">e</span>
+        <span class="animate-letter" style="--delay: 2.0s">r</span>
+    </div>
+</div>
 
+<div class="mx-auto max-w-screen-xl px-4 sm:px-6 lg:px-8">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-8">
         {% for podcast in podcasts %}
-        <div class="rounded-lg bg-white p-6 shadow-lg">
+        <div class="rounded-lg bg-black p-6 shadow-lg relative">
+            <span class="absolute top-2 left-2 text-[8px] text-[#A4A5A6]">
+                {{ podcast.created_at|timeago }}
+            </span>
+            
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-xl font-bold text-black">{{ podcast.title }}</h3>
-                <button onclick="likePodcast({{ podcast.id }})" class="like-btn text-gray-500 hover:text-red-500">
-                    <span class="likes-count">{{ podcast.likes }}</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                    </svg>
-                </button>
+                <h3 class="text-xl font-bold text-[#A4A5A6]">{{ podcast.title }}</h3>
+                <div class="flex space-x-2">
+                    <button onclick="likePodcast({{ podcast.id }})" class="like-btn text-[#A4A5A6] hover:text-red-500" data-podcast-id="{{ podcast.id }}">
+                        <span class="likes-count">{{ podcast.likes }}</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        </svg>
+                    </button>
+                    <button onclick="sharePodcast({{ podcast.id }})" class="share-btn text-[#A4A5A6] hover:text-blue-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                    </button>
+                </div>
             </div>
             
-            <p class="text-gray-700 mb-4">{{ podcast.description }}</p>
+            <p class="text-[#A4A5A6] mb-4">{{ podcast.description }}</p>
             
             <div class="audio-player">
                 <audio class="plyr" controls>
@@ -30,5 +54,10 @@
         </div>
         {% endfor %}
     </div>
+</div>
+
+<!-- Share Notification -->
+<div id="shareNotification" class="fixed bottom-4 right-4 bg-black text-white px-4 py-2 rounded-lg shadow-lg transform translate-y-full opacity-0 transition-all duration-300">
+    Link copied to clipboard!
 </div>
 {% endblock %}

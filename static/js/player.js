@@ -1,3 +1,14 @@
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        const preloader = document.getElementById('preloader');
+        preloader.style.opacity = '0';
+        preloader.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => {
+            preloader.style.display = 'none';
+        }, 300);
+    }, 1500); // Reduced from 3000 to 1500ms for faster animation
+});
+
 // Initialize Plyr for all audio players
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize all audio players
@@ -199,3 +210,56 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+// Add preloader functionality
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        const preloader = document.getElementById('preloader');
+        preloader.style.opacity = '0';
+        preloader.style.transition = 'opacity 0.5s ease';
+        setTimeout(() => {
+            preloader.style.display = 'none';
+        }, 500);
+    }, 3000);
+});
+
+// Share functionality
+function sharePodcast(podcastId) {
+    const shareUrl = `${window.location.origin}/podcast/${podcastId}`;
+    
+    navigator.clipboard.writeText(shareUrl).then(() => {
+        const notification = document.getElementById('shareNotification');
+        notification.classList.add('share-notification-show');
+        
+        setTimeout(() => {
+            notification.classList.remove('share-notification-show');
+        }, 3000);
+    });
+}
+
+// Like limitation using localStorage
+function likePodcast(podcastId) {
+    const likeKey = `podcast-like-${podcastId}`;
+    if (localStorage.getItem(likeKey)) {
+        return;
+    }
+
+    fetch(`/like/${podcastId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        const likeBtn = document.querySelector(`[data-podcast-id="${podcastId}"]`);
+        const likesCount = likeBtn.querySelector('.likes-count');
+        likesCount.textContent = data.likes;
+        localStorage.setItem(likeKey, 'true');
+        
+        likeBtn.classList.add('text-red-500');
+        setTimeout(() => {
+            likeBtn.classList.remove('text-red-500');
+        }, 200);
+    })
+    .catch(error => console.error('Error:', error));
+}

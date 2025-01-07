@@ -1,3 +1,4 @@
+<!-- templates/base.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,38 +14,7 @@
     <meta property="og:image" content="/static/images/og-image.jpg">
     <meta property="og:url" content="https://poster-pod.up.railway.app">
     <meta property="og:type" content="website">
-
-    <!-- Twitter Card Meta Tags -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Poster Podcast - Free Podcast Listening">
-    <meta name="twitter:description" content="Discover and enjoy free podcasts on Poster Podcast. Explore fascinating topics today!">
-    <meta name="twitter:image" content="/static/images/twitter-image.jpg">
-    
-    <!-- Structured Data (JSON-LD) -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "WebApplication",
-        "name": "Poster Podcast",
-        "url": "https://poster-pod.up.railway.app",
-        "description": "A web and mobile app for free podcast listening across fascinating topics.",
-        "applicationCategory": "Entertainment",
-        "operatingSystem": "Web, iOS, Android",
-        "publisher": {
-            "@type": "Organization",
-            "name": "Poster Podcast"
-        }
-    }
-    </script>
-
-    <!-- Favicon -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png">
-    <link rel="manifest" href="/static/site.webmanifest">
-
-    <!-- Canonical URL -->
-    <link rel="canonical" href="https://poster-pod.up.railway.app">
+    {% block head_extra %}{% endblock %}
 
     <title>Poster Podcast | Free and Fascinating Podcasts</title>
     
@@ -54,8 +24,20 @@
     <link rel="stylesheet" href="/static/css/styles.css">
     <script src="https://cdn.plyr.io/3.7.2/plyr.js"></script>
 </head>
-<body style="background-color: #A4A5A6;">
-    {% block content %}{% endblock %}
+<body class="bg-[#A4A5A6] min-h-screen flex flex-col">
+    <header class="py-6 text-center">
+        <h1 class="text-4xl font-bold tracking-tight text-black">Poster Podcasts</h1>
+        <p class="text-sm text-gray-600">Free and Fascinating</p>
+    </header>
+
+    <main class="flex-grow">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="py-4 text-center">
+        <p class="text-black text-[8px]">Discover and enjoy free podcasts on Poster Podcast. Explore fascinating topics today!</p>
+    </footer>
+
     <script src="/static/js/player.js"></script>
 </body>
 </html>

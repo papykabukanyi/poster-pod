@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, abort
+from flask import Flask, render_template, request, jsonify, abort, session
 import cloudinary
 import cloudinary.uploader
 import os
@@ -12,6 +12,8 @@ app = Flask(__name__)
 
 # Load configuration
 app.config.from_object('config')
+# Set a secret key for session management
+app.secret_key = os.urandom(24)
 
 # Initialize SQLAlchemy with the new style
 engine = create_engine(SQLALCHEMY_DATABASE_URI)
@@ -28,6 +30,33 @@ cloudinary.config(
     api_key=CLOUDINARY_API_KEY,
     api_secret=CLOUDINARY_API_SECRET
 )
+
+# Timeago filter
+def timeago(date):
+    now = datetime.utcnow()
+    diff = now - date
+    
+    seconds = diff.total_seconds()
+    minutes = seconds // 60
+    hours = minutes // 60
+    days = diff.days
+    
+    if days > 365:
+        years = days // 365
+        return f"{int(years)}y ago"
+    if days > 30:
+        months = days // 30
+        return f"{int(months)}mo ago"
+    if days > 0:
+        return f"{int(days)}d ago"
+    if hours > 0:
+        return f"{int(hours)}h ago"
+    if minutes > 0:
+        return f"{int(minutes)}m ago"
+    return "just now"
+
+# Register the filter with Jinja2 after app initialization
+app.jinja_env.filters['timeago'] = timeago
 
 # Database Models
 class Podcast(Base):
@@ -73,12 +102,17 @@ def admin():
 
 @app.route('/like/<int:podcast_id>', methods=['POST'])
 def like_podcast(podcast_id):
-    # Manual implementation of get_or_404
-    podcast = db_session.query(Podcast).filter_by(id=podcast_id).first()
-    if podcast is None:
-        abort(404)  # Return 404 error if podcast not found
-
+    podcast = Podcast.query.get_or_404(podcast_id)
+    
+    # Check if user has already liked this podcast
+    session_likes = session.get('likes', {})
+    if str(podcast_id) in session_likes:
+        return jsonify({'error': 'Already liked'}), 400
+    
     podcast.likes += 1
+    session_likes[str(podcast_id)] = True
+    session['likes'] = session_likes
+    
     db_session.commit()
     return jsonify({'likes': podcast.likes})
 
@@ -118,6 +152,13 @@ def upload_podcast():
             return jsonify({'error': 'Upload failed'}), 500
     
     return jsonify({'error': 'Invalid file type'}), 400
+
+@app.route('/podcast/<int:podcast_id>')
+def single_podcast(podcast_id):
+    podcast = db_session.query(Podcast).get(podcast_id)
+    if podcast is None:
+        abort(404)
+    return render_template('single_podcast.html', podcast=podcast)
 
 @app.route('/health', methods=['GET'])
 def health_check():
