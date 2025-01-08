@@ -179,9 +179,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function adjustHeaderForMobile() {
         const header = document.querySelector('header');
         if (window.innerWidth <= 768 && header) {
-            header.style.paddingTop = '40px';
+            header.style.paddingTop = '60px';
         } else if (header) {
-            header.style.paddingTop = '24px';
+            header.style.paddingTop = '14px';
         }
     }
 
