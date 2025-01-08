@@ -1,6 +1,3 @@
-// Remove the direct import and use CDN
-const WaveformPath = window.WaveformPath;
-
 document.addEventListener('DOMContentLoaded', () => {
     // Preloader handling
     const preloader = document.getElementById('preloader');
@@ -29,82 +26,75 @@ document.addEventListener('DOMContentLoaded', () => {
         // Create canvas for gradient
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        
-        // Define gradients
+
+        // Define the waveform gradient
         const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height * 1.35);
-        gradient.addColorStop(0, '#656666');
-        gradient.addColorStop(0.7, '#656666');
-        gradient.addColorStop(0.7, '#ffffff');
-        gradient.addColorStop(0.72, '#B1B1B1');
-        gradient.addColorStop(1, '#B1B1B1');
+        gradient.addColorStop(0, '#656666'); // Top color
+        gradient.addColorStop((canvas.height * 0.7) / canvas.height, '#656666'); // Top color
+        gradient.addColorStop((canvas.height * 0.7 + 1) / canvas.height, '#ffffff'); // White line
+        gradient.addColorStop((canvas.height * 0.7 + 2) / canvas.height, '#ffffff'); // White line
+        gradient.addColorStop((canvas.height * 0.7 + 3) / canvas.height, '#B1B1B1'); // Bottom color
+        gradient.addColorStop(1, '#B1B1B1'); // Bottom color
 
+        // Define the progress gradient
         const progressGradient = ctx.createLinearGradient(0, 0, 0, canvas.height * 1.35);
-        progressGradient.addColorStop(0, '#EE772F');
-        progressGradient.addColorStop(0.7, '#EB4926');
-        progressGradient.addColorStop(0.7, '#ffffff');
-        progressGradient.addColorStop(0.72, '#F6B094');
-        progressGradient.addColorStop(1, '#F6B094');
+        progressGradient.addColorStop(0, '#EE772F'); // Top color
+        progressGradient.addColorStop((canvas.height * 0.7) / canvas.height, '#EB4926'); // Top color
+        progressGradient.addColorStop((canvas.height * 0.7 + 1) / canvas.height, '#ffffff'); // White line
+        progressGradient.addColorStop((canvas.height * 0.7 + 2) / canvas.height, '#ffffff'); // White line
+        progressGradient.addColorStop((canvas.height * 0.7 + 3) / canvas.height, '#F6B094'); // Bottom color
+        progressGradient.addColorStop(1, '#F6B094'); // Bottom color
 
-        // Initialize WaveSurfer
+        // Create the waveform
         const wavesurfer = WaveSurfer.create({
             container: container,
-            waveColor: '#A4A5A6',
-            progressColor: '#4a4a4a',
-            url: audio.src,
-            height: 40,
+            waveColor: '#656666', // Light gray
+            progressColor: '#333333', // Dark gray for progress
             barWidth: 2,
-            barGap: 1,
-            barRadius: 3
+            barHeight: 0.6, // Shorter bars
+            barGap: 2,
+            height: 40,
+            normalize: true,
+            url: audio.src,
         });
 
         wavesurfers.push(wavesurfer);
 
-        // Handle play button click
+        // Play/pause on click
         playButton.addEventListener('click', () => {
-            if (activePlayer && activePlayer !== wavesurfer) {
-                activePlayer.pause();
-                const activeIndex = wavesurfers.indexOf(activePlayer);
-                if (activeIndex !== -1) {
-                    updatePlayIcon(activeIndex, false);
-                }
-            }
             wavesurfer.playPause();
-            activePlayer = wavesurfer;
+            playButton.querySelector('.play-icon').classList.toggle('hidden');
+            playButton.querySelector('.pause-icon').classList.toggle('hidden');
         });
 
-        // Handle volume changes
+        // Volume control
         volumeSlider.addEventListener('input', (e) => {
-            wavesurfer.setVolume(parseFloat(e.target.value));
+            wavesurfer.setVolume(e.target.value);
         });
 
-        // Update play button state
-        wavesurfer.on('play', () => {
-            updatePlayIcon(index, true);
-            activePlayer = wavesurfer;
+        // Current time & duration
+        const formatTime = (seconds) => {
+            const minutes = Math.floor(seconds / 60);
+            const secondsRemainder = Math.round(seconds) % 60;
+            const paddedSeconds = `0${secondsRemainder}`.slice(-2);
+            return `${minutes}:${paddedSeconds}`;
+        };
+
+        const timeEl = player.querySelector('#time');
+        const durationEl = player.querySelector('#duration');
+        wavesurfer.on('ready', () => {
+            durationEl.textContent = formatTime(wavesurfer.getDuration());
+        });
+        wavesurfer.on('audioprocess', () => {
+            timeEl.textContent = formatTime(wavesurfer.getCurrentTime());
         });
 
-        wavesurfer.on('pause', () => {
-            updatePlayIcon(index, false);
-        });
-
-        wavesurfer.on('finish', () => {
-            updatePlayIcon(index, false);
-            activePlayer = null;
+        // Hover effect
+        const hover = player.querySelector('#hover');
+        container.addEventListener('pointermove', (e) => {
+            hover.style.width = `${e.offsetX}px`;
         });
     });
-
-    // Helper function to update play icon
-    function updatePlayIcon(index, isPlaying) {
-        const playButton = document.querySelectorAll('.play-button')[index];
-        if (playButton) {
-            const playIcon = playButton.querySelector('.play-icon');
-            const pauseIcon = playButton.querySelector('.pause-icon');
-            if (playIcon && pauseIcon) {
-                playIcon.style.display = isPlaying ? 'none' : 'block';
-                pauseIcon.style.display = isPlaying ? 'block' : 'none';
-            }
-        }
-    }
 
     // Update view count
     function updateViewCount(podcastId) {

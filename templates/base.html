@@ -25,8 +25,7 @@
     <!-- Styles and Scripts -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/waveform-path@1.1.0/dist/waveform-path.js"></script>
-    <script src="https://unpkg.com/wavesurfer.js@7"></script>
-    <script type="module" src="{{ url_for('static', filename='js/player.js') }}"></script>
+    <script src="https://unpkg.com/wavesurfer.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body class="bg-[#A4A5A6] min-h-screen flex flex-col">
@@ -36,12 +35,32 @@
     </header>
 
     <main class="flex-grow">
-        {% block content %}{% endblock %}
+        {% block content %}
+        <div class="audio-player">
+            <audio src="{{ podcast.audio_url }}" preload="metadata"></audio>
+            <div class="controls flex items-center space-x-4 mt-2">
+                <button class="play-button text-white p-2">
+                    <svg class="play-icon w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    </svg>
+                    <svg class="pause-icon w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </button>
+                <div class="waveform-container flex-1 relative">
+                    <div id="time" class="absolute left-0 top-0 z-10 text-xs text-[#A4A5A6] p-1">0:00</div>
+                    <div id="duration" class="absolute right-0 top-0 z-10 text-xs text-[#A4A5A6] p-1">0:00</div>
+                    <div id="hover" class="absolute left-0 top-0 z-10 h-full w-0 bg-white opacity-50 transition-opacity duration-200"></div>
+                </div>
+                <input type="range" class="volume-slider" min="0" max="1" step="0.01" value="1">
+            </div>
+        </div>
+        {% endblock %}
     </main>
 
     <footer class="py-4 text-center">
         <p class="text-black text-[8px]">Discover and enjoy free podcasts on Poster Podcast. Explore fascinating topics today!</p>
     </footer>
-
+    <script type="module" src="{{ url_for('static', filename='js/player.js') }}"></script>
 </body>
 </html>
