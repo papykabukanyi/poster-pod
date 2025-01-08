@@ -155,31 +155,40 @@ def upload_podcast():
 
 @app.route('/podcast/<int:podcast_id>')
 def single_podcast(podcast_id):
-    podcast = Podcast.query.get(podcast_id)
-    if not podcast:
-        abort(404, description="Podcast not found")
-    
-    metadata = {
-        'title': podcast.title,
-        'description': podcast.description,
-        'audio_url': podcast.audio_url,
-        'duration': podcast.duration,
-        'thumbnail': f"{request.url_root}static/images/podcast-thumbnail.jpg",
-        'embed_url': f"{request.url_root}embed/{podcast.id}"
-    }
-    
-    podcast.metadata = json.dumps(metadata)
-    db_session.commit()
-    
-    return render_template('single_podcast.html', podcast=podcast)
+    try:
+        podcast = Podcast.query.get(podcast_id)
+        if not podcast:
+            abort(404)
+        
+        metadata = {
+            'title': podcast.title,
+            'description': podcast.description,
+            'audio_url': podcast.audio_url,
+            'duration': podcast.duration,
+            'thumbnail': f"{request.url_root}static/images/podcast-thumbnail.jpg",
+            'embed_url': f"{request.url_root}embed/{podcast.id}"
+        }
+        
+        if hasattr(podcast, 'metadata'):
+            podcast.metadata = json.dumps(metadata)
+            db_session.commit()
+        
+        return render_template('single_podcast.html', podcast=podcast)
+    except Exception as e:
+        print(f"Error in single_podcast route: {e}")
+        db_session.rollback()
+        return "Error loading podcast", 500
 
 @app.route('/embed/<int:podcast_id>')
 def embed_podcast(podcast_id):
     try:
-        podcast = Podcast.query.get_or_404(podcast_id)
+        podcast = Podcast.query.get(podcast_id)
+        if not podcast:
+            abort(404)
+            
         response = make_response(render_template('embed.html', podcast=podcast))
-        # Allow embedding on any domain
-        response.headers['X-Frame-Options'] = 'ALLOWALL'
+        response.headers['X-Frame-Options'] = 'ALLOW-FROM https://www.linkedin.com'
+        response.headers['Content-Security-Policy'] = "frame-ancestors 'self' https://www.linkedin.com https://platform.linkedin.com"
         return response
     except Exception as e:
         print(f"Error in embed_podcast: {e}")

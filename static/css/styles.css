@@ -365,6 +365,38 @@
     background: rgba(255, 255, 255, 0.1);
 }
 
+.like-btn svg,
+.share-btn svg,
+.embed-btn svg {
+    width: 12px !important;
+    height: 12px !important;
+    transition: transform 0.2s ease;
+}
+
+/* Adjust the button padding to accommodate smaller icons */
+.like-btn, 
+.share-btn,
+.embed-btn {
+    padding: 0px;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+}
+
+/* Like count text size */
+.likes-count {
+    font-size: 12px;
+    margin-right: 2px;
+}
+
+/* Button container spacing */
+.flex.space-x-2 {
+    gap: 4px; /* Reduce space between buttons */
+}
+
 /* Responsive Adjustments */
 @media (max-width: 640px) {
     .audio-player {
@@ -482,4 +514,9 @@ wave {
 .toast-notification.bg-green-500 {
     background-color: black !important;
     border-color: #10B981; /* Green border for success state */
+}
+
+.embed-btn:hover svg {
+    transform: scale(1.1);
+    transition: transform 0.2s ease;
 }

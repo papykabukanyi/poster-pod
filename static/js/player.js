@@ -12,14 +12,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize players
     const players = document.querySelectorAll('.audio-player');
-    let activePlayer = null;
+    let activeWavesurfer = null; // Track currently playing wavesurfer
     const wavesurfers = [];
 
     players.forEach((player, index) => {
         const audio = player.querySelector('audio');
         const container = player.querySelector('.waveform-container');
         const playButton = player.querySelector('.play-button');
-
         const volumeSlider = player.querySelector('.volume-slider');
 
         if (!audio || !container) return;
@@ -61,11 +60,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
         wavesurfers.push(wavesurfer);
 
-        // Play/pause on click
+        // Play/pause handling with single player logic
         playButton.addEventListener('click', () => {
+            if (activeWavesurfer && activeWavesurfer !== wavesurfer) {
+                // Stop currently playing audio
+                activeWavesurfer.pause();
+                // Reset play/pause button of previously playing audio
+                const activePlayers = document.querySelectorAll('.audio-player');
+                activePlayers.forEach(p => {
+                    const btn = p.querySelector('.play-button');
+                    btn.querySelector('.play-icon').classList.remove('hidden');
+                    btn.querySelector('.pause-icon').classList.add('hidden');
+                });
+            }
+
             wavesurfer.playPause();
             playButton.querySelector('.play-icon').classList.toggle('hidden');
             playButton.querySelector('.pause-icon').classList.toggle('hidden');
+            
+            if (wavesurfer.isPlaying()) {
+                activeWavesurfer = wavesurfer;
+            } else {
+                activeWavesurfer = null;
+            }
+        });
+
+        // Handle play/pause events
+        wavesurfer.on('play', () => {
+            activeWavesurfer = wavesurfer;
+        });
+
+        wavesurfer.on('pause', () => {
+            if (activeWavesurfer === wavesurfer) {
+                activeWavesurfer = null;
+            }
+        });
+
+        // Handle finish event
+        wavesurfer.on('finish', () => {
+            playButton.querySelector('.play-icon').classList.remove('hidden');
+            playButton.querySelector('.pause-icon').classList.add('hidden');
+            activeWavesurfer = null;
         });
 
         // Volume control
@@ -157,30 +192,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Share functionality with social media preview
     async function sharePodcast(podcastId) {
         const shareUrl = `${window.location.origin}/podcast/${podcastId}`;
-        
         try {
-            if (navigator.share) {
-                // Mobile native share
-                await navigator.share({
-                    title: document.title,
-                    text: 'Check out this podcast!',
-                    url: shareUrl
-                });
-                showToast('Shared successfully!');
-            } else {
-                // Copy to clipboard fallback
-                await navigator.clipboard.writeText(shareUrl);
-                showToast('Link copied to clipboard!');
-            }
+            await navigator.clipboard.writeText(shareUrl);
+            showToast('Link copied to clipboard!');
         } catch (err) {
-            if (err.name === 'AbortError') {
-                console.warn('Share canceled by user, copying link to clipboard');
-                await navigator.clipboard.writeText(shareUrl);
-                showToast('Link copied to clipboard!');
-            } else {
-                console.error('Error sharing:', err);
-                showToast('Failed to share podcast', 'error');
-            }
+            console.error('Error copying link:', err);
+            showToast('Failed to copy link', 'error');
         }
     }
 
@@ -222,6 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.likePodcast = likePodcast;
     window.sharePodcast = sharePodcast;
     window.updateViewCount = updateViewCount;
+    window.embedPodcast = embedPodcast;
 
     const uploadForm = document.getElementById('uploadForm');
     if (uploadForm) {
@@ -281,3 +299,26 @@ function showToast(message, type = 'success') {
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
+
+// Add this new function for embedding podcasts
+async function embedPodcast(podcastId) {
+    const embedCode = `<iframe 
+        src="${window.location.origin}/embed/${podcastId}" 
+        width="100%" 
+        height="160" 
+        frameborder="0" 
+        allowfullscreen 
+        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture">
+    </iframe>`;
+    
+    try {
+        await navigator.clipboard.writeText(embedCode);
+        showToast('Embed code copied! You can now paste it in your social media post');
+    } catch (err) {
+        console.error('Error copying embed code:', err);
+        showToast('Failed to copy embed code', 'error');
+    }
+}
+
+// Add to window object
+window.embedPodcast = embedPodcast;
