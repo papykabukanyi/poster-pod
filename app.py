@@ -3,11 +3,12 @@ from flask import Flask, render_template, request, jsonify, abort, session, make
 import cloudinary
 import cloudinary.uploader
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, JSON
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, JSON, text
 from sqlalchemy.orm import scoped_session, sessionmaker, declarative_base
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 from config import *
+from cloudinary import uploader
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -67,6 +68,7 @@ class Podcast(Base):
     views = Column(Integer, default=0)
     embed_data = Column(JSON, default={}, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    cloudinary_public_id = Column(String(200))  # Add this field
 
     def to_dict(self):
         return {
@@ -78,7 +80,8 @@ class Podcast(Base):
             'likes': self.likes,
             'views': self.views,
             'embed_data': self.embed_data if self.embed_data else {},
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat(),
+            'cloudinary_public_id': self.cloudinary_public_id
         }
 
 @app.route('/')
@@ -93,8 +96,14 @@ def index():
 
 @app.route('/admin')
 def admin():
-    podcasts = Podcast.query.order_by(Podcast.created_at.desc()).all()
-    return render_template('admin.html', podcasts=podcasts)
+    try:
+        # Get podcasts ordered by creation date (newest first)
+        podcasts = Podcast.query.order_by(Podcast.created_at.desc()).all()
+        return render_template('admin.html', podcasts=podcasts)
+    except Exception as e:
+        print(f"Error in admin route: {e}")
+        db_session.rollback()
+        return "Error loading admin dashboard", 500
 
 @app.route('/like/<int:podcast_id>', methods=['POST'])
 def like_podcast(podcast_id):
@@ -130,25 +139,53 @@ def upload_podcast():
     
     if file and file.filename.endswith(('.mp3', '.wav', '.m4a')):
         try:
-            result = cloudinary.uploader.upload(
+            # Generate a unique ID for the file
+            unique_id = f"podcast_{datetime.utcnow().timestamp()}_{os.urandom(8).hex()}"
+            
+            # Check if a podcast with same title exists within last minute
+            recent_duplicate = Podcast.query.filter(
+                Podcast.title == title,
+                Podcast.created_at >= datetime.utcnow() - timedelta(minutes=1)
+            ).first()
+            
+            if recent_duplicate:
+                return jsonify({'error': 'A podcast with this title was just uploaded'}), 400
+            
+            # Upload to Cloudinary with unique ID
+            result = uploader.upload(
                 file,
                 resource_type="auto",
-                folder="podcasts/"
+                folder="podcasts/",
+                public_id=unique_id,
+                overwrite=False,  # Prevent overwriting
+                unique_filename=True  # Ensure unique filename
             )
             
+            if not result or 'secure_url' not in result:
+                raise Exception("Upload failed")
+            
+            # Create podcast instance
             podcast = Podcast(
                 title=title,
                 description=description,
                 audio_url=result['secure_url'],
-                duration=result.get('duration', 0)
+                duration=result.get('duration', 0),
+                cloudinary_public_id=result['public_id']
             )
             
             db_session.add(podcast)
             db_session.commit()
             
             return jsonify(podcast.to_dict()), 200
+            
         except Exception as e:
+            db_session.rollback()
             print(f"Upload error: {str(e)}")
+            if 'result' in locals() and result.get('public_id'):
+                try:
+                    uploader.destroy(result['public_id'], resource_type="video")
+                except Exception as ce:
+                    print(f"Cloudinary cleanup error: {ce}")
             return jsonify({'error': 'Upload failed'}), 500
     
     return jsonify({'error': 'Invalid file type'}), 400
@@ -201,13 +238,72 @@ def increment_views(podcast_id):
     db_session.commit()
     return jsonify({'views': podcast.views})
 
+@app.route('/podcast/<int:podcast_id>', methods=['DELETE'])
+def delete_podcast(podcast_id):
+    try:
+        podcast = Podcast.query.get(podcast_id)
+        if not podcast:
+            return jsonify({'error': 'Podcast not found'}), 404
+        
+        # Delete from Cloudinary first
+        if podcast.cloudinary_public_id:
+            try:
+                # Proper Cloudinary deletion with error handling
+                delete_result = uploader.destroy(
+                    podcast.cloudinary_public_id,
+                    resource_type="video",  # Important: use video for audio files
+                    invalidate=True  # Invalidate CDN cache
+                )
+                
+                if delete_result.get('result') != 'ok':
+                    print(f"Cloudinary delete warning: {delete_result}")
+                    # Continue with database deletion even if Cloudinary fails
+                
+            except Exception as e:
+                print(f"Cloudinary delete error: {e}")
+                # Continue with database deletion even if Cloudinary fails
+        
+        # Delete from database
+        db_session.delete(podcast)
+        db_session.commit()
+        
+        return jsonify({'message': 'Podcast deleted successfully'}), 200
+        
+    except Exception as e:
+        db_session.rollback()
+        print(f"Error deleting podcast: {e}")
+        return jsonify({'error': 'Failed to delete podcast'}), 500
+
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({'status': 'healthy'}), 200
 
+# Update init_db to include new column
 def init_db():
-    Base.metadata.create_all(bind=engine)
-    print("Database initialized successfully!")
+    try:
+        # Create tables
+        Base.metadata.create_all(bind=engine)
+        
+        # Add cloudinary_public_id column if it doesn't exist
+        with engine.connect() as connection:
+            connection.execute(text("""
+                DO $$ 
+                BEGIN 
+                    IF NOT EXISTS (
+                        SELECT 1 
+                        FROM information_schema.columns 
+                        WHERE table_name='podcasts' 
+                        AND column_name='cloudinary_public_id'
+                    ) THEN 
+                        ALTER TABLE podcasts 
+                        ADD COLUMN cloudinary_public_id VARCHAR(200);
+                    END IF;
+                END $$;
+            """))
+            connection.commit()
+        print("Database initialized successfully!")
+    except Exception as e:
+        print(f"Error initializing database: {e}")
 
 @app.teardown_appcontext
 def shutdown_session(exception=None):

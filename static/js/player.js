@@ -203,20 +203,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-        if (!activePlayer || e.target.matches('input, textarea')) return;
+        if (!activeWavesurfer || e.target.matches('input, textarea')) return;
 
         switch(e.key) {
             case ' ':
                 e.preventDefault();
-                activePlayer.playPause();
+                const activePlayButton = document.querySelector('.audio-player .play-button');
+                if (activePlayButton) {
+                    activePlayButton.click();
+                }
                 break;
             case 'ArrowLeft':
                 e.preventDefault();
-                activePlayer.skip(-10);
+                if (activeWavesurfer) {
+                    activeWavesurfer.skip(-10);
+                }
                 break;
             case 'ArrowRight':
                 e.preventDefault();
-                activePlayer.skip(10);
+                if (activeWavesurfer) {
+                    activeWavesurfer.skip(10);
+                }
                 break;
         }
     });
@@ -245,22 +252,48 @@ document.addEventListener('DOMContentLoaded', () => {
     if (uploadForm) {
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // Prevent duplicate submissions
+            if (isUploading) return;
+            isUploading = true;
+            
+            // Show loading state
+            uploadSpinner.classList.remove('hidden');
+            buttonText.textContent = 'Uploading...';
+            uploadButton.disabled = true;
+
             const formData = new FormData(uploadForm);
+            
             try {
                 const response = await fetch('/upload', {
                     method: 'POST',
                     body: formData
                 });
+                
                 const data = await response.json();
+                
                 if (response.ok) {
-                    alert('Podcast uploaded successfully!');
-                    window.location.reload();
+                    // Add new podcast to list
+                    const newPodcastElement = createPodcastElement(data);
+                    podcastList.insertAdjacentHTML('afterbegin', newPodcastElement);
+                    
+                    // Show success message
+                    showAdminToast('Podcast uploaded successfully!', 'success');
+                    
+                    // Reset form
+                    uploadForm.reset();
                 } else {
-                    alert(`Error: ${data.error}`);
+                    showAdminToast(data.error || 'Upload failed', 'error');
                 }
             } catch (error) {
-                console.error('Error uploading podcast:', error);
-                alert('An error occurred while uploading the podcast.');
+                console.error('Error:', error);
+                showAdminToast('Upload failed', 'error');
+            } finally {
+                // Reset states
+                isUploading = false;
+                uploadSpinner.classList.add('hidden');
+                buttonText.textContent = 'Upload Podcast';
+                uploadButton.disabled = false;
             }
         });
     }
