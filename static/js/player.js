@@ -226,29 +226,57 @@ document.addEventListener('DOMContentLoaded', () => {
                 startTime = 0;
             }
         });
+
+        let playTimer = null;
+        let totalPlayTime = 0;
+        const PLAY_COUNT_INTERVAL = 30; // 30 seconds
+
+        // Handle play event with 30-second intervals
+        wavesurfer.on('play', () => {
+            activeWavesurfer = wavesurfer;
+            if (!playTimer) {
+                playTimer = setInterval(() => {
+                    totalPlayTime += 30;
+                    if (totalPlayTime >= 30 && podcastId) {
+                        updateViewCount(podcastId);
+                    }
+                }, PLAY_COUNT_INTERVAL * 1000);
+            }
+        });
+
+        // Handle pause and finish events
+        wavesurfer.on('pause', () => {
+            if (playTimer) {
+                clearInterval(playTimer);
+                playTimer = null;
+            }
+        });
+
+        wavesurfer.on('finish', () => {
+            if (playTimer) {
+                clearInterval(playTimer);
+                playTimer = null;
+            }
+            totalPlayTime = 0;
+        });
     });
 
     // Update view count
     function updateViewCount(podcastId) {
-        const viewKey = `podcast-view-${podcastId}`;
-        if (!localStorage.getItem(viewKey)) {
-            fetch(`/views/${podcastId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                // Update all instances of this podcast's view count
-                const viewCounts = document.querySelectorAll(`[data-view-count="${podcastId}"]`);
-                viewCounts.forEach(viewCount => {
-                    viewCount.textContent = `${data.views} plays`;
-                });
-                localStorage.setItem(viewKey, 'true');
-            })
-            .catch(console.error);
-        }
+        fetch(`/views/${podcastId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            const viewCounts = document.querySelectorAll(`[data-view-count="${podcastId}"]`);
+            viewCounts.forEach(viewCount => {
+                viewCount.textContent = `${data.views} plays`;
+            });
+        })
+        .catch(console.error);
     }
 
     // Handle likes with session management
@@ -412,17 +440,16 @@ function showToast(message, type = 'success') {
 // Add this new function for embedding podcasts
 async function embedPodcast(podcastId) {
     const embedCode = `<iframe 
-        src="${window.location.origin}/embed/${podcastId}" 
-        width="100%" 
-        height="160" 
-        frameborder="0" 
-        allowfullscreen 
-        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture">
+        src="${window.location.origin}/embed/${podcastId}"
+        style="border: 0; width: 100%; height: 120px; border-radius: 8px;"
+        title="Poster Podcast Player"
+        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture"
+        loading="lazy">
     </iframe>`;
     
     try {
         await navigator.clipboard.writeText(embedCode);
-        showToast('Embed code copied! You can now paste it in your social media post');
+        showToast('Embed code copied! Ready to paste anywhere');
     } catch (err) {
         console.error('Error copying embed code:', err);
         showToast('Failed to copy embed code', 'error');
