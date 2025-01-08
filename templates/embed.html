@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ podcast.title }} - Poster Podcast</title>
+    <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        body { margin: 0; padding: 0; background: #1a1a1a; }
+        .embed-player { width: 100%; height: 100%; padding: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="embed-player">
+        <div class="rounded-lg bg-black p-4">
+            <h3 class="text-lg font-bold text-[#A4A5A6] mb-2">{{ podcast.title }}</h3>
+            <div class="audio-player">
+                <div class="waveform-container"></div>
+                <div class="controls flex justify-between items-center mt-2">
+                    <button class="play-button text-white p-2">
+                        <svg class="play-icon w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        </svg>
+                        <svg class="pause-icon w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </button>
+                    <button onclick="likePodcast({{ podcast.id }})" class="like-btn text-[#A4A5A6] hover:text-red-500" data-podcast-id="{{ podcast.id }}">
+                        <span class="likes-count">{{ podcast.likes }}</span>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="text-[#A4A5A6] text-[8px] mt-1">
+                    <span data-view-count="{{ podcast.id }}">{{ podcast.views }} listens</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/player.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            updateViewCount({{ podcast.id }});
+        });
+    </script>
+</body>
+</html>

@@ -10,10 +10,15 @@ def migrate_database():
                 ALTER TABLE podcasts 
                 ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0;
             """))
+            # Add metadata column for social embeds
+            connection.execute(text("""
+                ALTER TABLE podcasts 
+                ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+            """))
             connection.commit()
-            print("Successfully added views column")
+            print("Successfully added views and metadata columns")
         except Exception as e:
-            print(f"Error adding views column: {e}")
+            print(f"Error adding columns: {e}")
             connection.rollback()
 
 if __name__ == "__main__":

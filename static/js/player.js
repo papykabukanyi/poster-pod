@@ -1,265 +1,209 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Preloader animation
     setTimeout(() => {
         const preloader = document.getElementById('preloader');
-        preloader.style.opacity = '0';
-        preloader.style.transition = 'opacity 0.3s ease';
-        setTimeout(() => {
-            preloader.style.display = 'none';
-        }, 300);
-    }, 1500); // Reduced from 3000 to 1500ms for faster animation
-});
+        if (preloader) {
+            preloader.style.opacity = '0';
+            preloader.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => {
+                preloader.style.display = 'none';
+            }, 300);
+        }
+    }, 1500);
 
-// Initialize Plyr for all audio players
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize all audio players
-    const players = Plyr.setup('.plyr', {
-        controls: [
-            'play',
-            'progress',
-            'current-time',
-            'duration',
-            'mute',
-            'volume',
-        ]
-    });
+    // Initialize WaveSurfer for all audio players
+    const players = document.querySelectorAll('.plyr');
+    let activePlayer = null;
+    const wavesurfers = [];
 
-    // Handle player events
-    players.forEach(player => {
-        // Update localStorage with current time for resume functionality
-        player.on('timeupdate', (event) => {
-            const audio = event.target;
-            const source = audio.querySelector('source').src;
-            localStorage.setItem(`podcast-${source}`, player.currentTime);
+    players.forEach((player, index) => {
+        // Create waveform container
+        const waveformContainer = document.createElement('div');
+        waveformContainer.className = 'waveform-container';
+        player.parentElement.appendChild(waveformContainer);
+
+        // Initialize WaveSurfer
+        const wavesurfer = WaveSurfer.create({
+            container: waveformContainer,
+            waveColor: '#4a5568',
+            progressColor: '#ffffff',
+            cursorColor: '#718096',
+            barWidth: 2,
+            barHeight: 1,
+            responsive: true,
+            height: 40,
+            barGap: 2,
+            normalize: true,
+            interact: true
+        });
+
+        // Load audio
+        const audioSource = player.querySelector('source').src;
+        wavesurfer.load(audioSource);
+        wavesurfers.push(wavesurfer);
+
+        // Handle play/pause
+        wavesurfer.on('play', () => {
+            if (activePlayer && activePlayer !== wavesurfer) {
+                activePlayer.pause();
+            }
+            activePlayer = wavesurfer;
+            updatePlayIcon(index, true);
+        });
+
+        wavesurfer.on('pause', () => {
+            updatePlayIcon(index, false);
+        });
+
+        // Update localStorage with current time
+        wavesurfer.on('audioprocess', () => {
+            localStorage.setItem(`podcast-${audioSource}`, wavesurfer.getCurrentTime());
         });
 
         // Resume from last position
-        player.on('ready', (event) => {
-            const audio = event.target;
-            const source = audio.querySelector('source').src;
-            const lastPosition = localStorage.getItem(`podcast-${source}`);
+        wavesurfer.on('ready', () => {
+            const lastPosition = localStorage.getItem(`podcast-${audioSource}`);
             if (lastPosition) {
-                player.currentTime = parseFloat(lastPosition);
+                wavesurfer.setCurrentTime(parseFloat(lastPosition));
             }
         });
+
+        // Handle play button click
+        const playButton = player.parentElement.querySelector('.play-button');
+        if (playButton) {
+            playButton.addEventListener('click', () => {
+                wavesurfer.playPause();
+            });
+        }
     });
-});
 
-// Handle like functionality
-async function likePodcast(podcastId) {
-    try {
-        const response = await fetch(`/like/${podcastId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            const likeBtn = document.querySelector(`[onclick="likePodcast(${podcastId})"]`);
-            const likesCount = likeBtn.querySelector('.likes-count');
-            likesCount.textContent = data.likes;
-            
-            // Add visual feedback
-            likeBtn.classList.add('text-red-500');
-            setTimeout(() => {
-                likeBtn.classList.remove('text-red-500');
-            }, 200);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-    }
-}
-
-// Handle file upload with drag and drop
-document.addEventListener('DOMContentLoaded', () => {
-    const uploadForm = document.getElementById('uploadForm');
-    const uploadZone = document.querySelector('.upload-zone');
-    
-    if (uploadForm && uploadZone) {
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            uploadZone.addEventListener(eventName, preventDefaults, false);
-        });
-
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            uploadZone.addEventListener(eventName, highlight, false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            uploadZone.addEventListener(eventName, unhighlight, false);
-        });
-
-        function highlight() {
-            uploadZone.classList.add('dragover');
-        }
-
-        function unhighlight() {
-            uploadZone.classList.remove('dragover');
-        }
-
-        uploadZone.addEventListener('drop', handleDrop, false);
-
-        function handleDrop(e) {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            handleFiles(files);
-        }
-
-        function handleFiles(files) {
-            if (files.length > 0) {
-                const fileInput = uploadForm.querySelector('input[type="file"]');
-                fileInput.files = files;
-            }
-        }
-    }
-});
-
-// Handle form submission with progress
-document.addEventListener('DOMContentLoaded', () => {
-    const uploadForm = document.getElementById('uploadForm');
-    
-    if (uploadForm) {
-        uploadForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const submitButton = uploadForm.querySelector('button[type="submit"]');
-            const originalText = submitButton.textContent;
-            
-            try {
-                submitButton.classList.add('loading');
-                submitButton.disabled = true;
-                submitButton.textContent = 'Uploading...';
-                
-                const formData = new FormData(uploadForm);
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    window.location.reload();
-                } else {
-                    throw new Error('Upload failed');
+    // Update view count
+    function updateViewCount(podcastId) {
+        const viewKey = `podcast-view-${podcastId}`;
+        if (!localStorage.getItem(viewKey)) {
+            fetch(`/views/${podcastId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
                 }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Upload failed. Please try again.');
-            } finally {
-                submitButton.classList.remove('loading');
-                submitButton.disabled = false;
-                submitButton.textContent = originalText;
-            }
-        });
+            })
+            .then(response => response.json())
+            .then(data => {
+                const viewCount = document.querySelector(`[data-view-count="${podcastId}"]`);
+                if (viewCount) {
+                    viewCount.textContent = `${data.views} listens`;
+                }
+                localStorage.setItem(viewKey, 'true');
+            })
+            .catch(console.error);
+        }
     }
-});
 
-// Add keyboard shortcuts for player controls
-document.addEventListener('keydown', (e) => {
-    const activePlayer = Plyr.setup('.plyr--playing')[0];
-    
-    if (activePlayer) {
+    // Handle likes with session management
+    async function likePodcast(podcastId) {
+        try {
+            const response = await fetch(`/like/${podcastId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const likeBtns = document.querySelectorAll(`[data-podcast-id="${podcastId}"]`);
+                
+                likeBtns.forEach(btn => {
+                    const likesCount = btn.querySelector('.likes-count');
+                    if (likesCount) {
+                        likesCount.textContent = data.likes;
+                        btn.classList.add('text-red-500');
+                        setTimeout(() => {
+                            btn.classList.remove('text-red-500');
+                        }, 200);
+                    }
+                });
+            } else if (response.status === 400) {
+                console.log('Already liked this podcast');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    // Share functionality with social media preview
+    function sharePodcast(podcastId) {
+        const shareUrl = `${window.location.origin}/podcast/${podcastId}`;
+        
+        if (navigator.share) {
+            navigator.share({
+                title: document.title,
+                text: 'Check out this podcast!',
+                url: shareUrl
+            }).catch(console.error);
+        } else {
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                const notification = document.getElementById('shareNotification');
+                if (notification) {
+                    notification.classList.add('share-notification-show');
+                    setTimeout(() => {
+                        notification.classList.remove('share-notification-show');
+                    }, 3000);
+                }
+            });
+        }
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        if (!activePlayer || e.target.matches('input, textarea')) return;
+
         switch(e.key) {
             case ' ':
-                if (!e.target.matches('input, textarea')) {
-                    e.preventDefault();
-                    activePlayer.togglePlay();
-                }
+                e.preventDefault();
+                activePlayer.playPause();
                 break;
             case 'ArrowLeft':
-                if (!e.target.matches('input, textarea')) {
-                    e.preventDefault();
-                    activePlayer.rewind(10);
-                }
+                e.preventDefault();
+                activePlayer.skip(-10);
                 break;
             case 'ArrowRight':
-                if (!e.target.matches('input, textarea')) {
-                    e.preventDefault();
-                    activePlayer.forward(10);
-                }
-                break;
-            case 'm':
-                if (!e.target.matches('input, textarea')) {
-                    e.preventDefault();
-                    activePlayer.toggleMute();
-                }
+                e.preventDefault();
+                activePlayer.skip(10);
                 break;
         }
-    }
-});
-
-// Add progress tracking for audio playback
-document.addEventListener('DOMContentLoaded', () => {
-    const players = document.querySelectorAll('.plyr');
-    
-    players.forEach(player => {
-        const progressBar = document.createElement('div');
-        progressBar.className = 'progress-bar mt-2';
-        const progressFill = document.createElement('div');
-        progressFill.className = 'progress-bar-fill';
-        progressBar.appendChild(progressFill);
-        player.parentElement.appendChild(progressBar);
-
-        player.addEventListener('timeupdate', () => {
-            const progress = (player.currentTime / player.duration) * 100;
-            progressFill.style.width = `${progress}%`;
-        });
     });
-});
-// Add preloader functionality
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        const preloader = document.getElementById('preloader');
-        preloader.style.opacity = '0';
-        preloader.style.transition = 'opacity 0.5s ease';
-        setTimeout(() => {
-            preloader.style.display = 'none';
-        }, 500);
-    }, 3000);
-});
 
-// Share functionality
-function sharePodcast(podcastId) {
-    const shareUrl = `${window.location.origin}/podcast/${podcastId}`;
-    
-    navigator.clipboard.writeText(shareUrl).then(() => {
-        const notification = document.getElementById('shareNotification');
-        notification.classList.add('share-notification-show');
-        
-        setTimeout(() => {
-            notification.classList.remove('share-notification-show');
-        }, 3000);
-    });
-}
-
-// Like limitation using localStorage
-function likePodcast(podcastId) {
-    const likeKey = `podcast-like-${podcastId}`;
-    if (localStorage.getItem(likeKey)) {
-        return;
+    // Mobile header adjustment
+    function adjustHeaderForMobile() {
+        const header = document.querySelector('header');
+        if (window.innerWidth <= 768 && header) {
+            header.style.paddingTop = '40px';
+        } else if (header) {
+            header.style.paddingTop = '24px';
+        }
     }
 
-    fetch(`/like/${podcastId}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        const likeBtn = document.querySelector(`[data-podcast-id="${podcastId}"]`);
-        const likesCount = likeBtn.querySelector('.likes-count');
-        likesCount.textContent = data.likes;
-        localStorage.setItem(likeKey, 'true');
-        
-        likeBtn.classList.add('text-red-500');
-        setTimeout(() => {
-            likeBtn.classList.remove('text-red-500');
-        }, 200);
-    })
-    .catch(error => console.error('Error:', error));
+    // Initialize
+    adjustHeaderForMobile();
+    window.addEventListener('resize', adjustHeaderForMobile);
+
+    // Expose functions globally
+    window.likePodcast = likePodcast;
+    window.sharePodcast = sharePodcast;
+    window.updateViewCount = updateViewCount;
+});
+
+// Helper function to update play icon
+function updatePlayIcon(index, isPlaying) {
+    const playButton = document.querySelectorAll('.play-button')[index];
+    if (playButton) {
+        const playIcon = playButton.querySelector('.play-icon');
+        const pauseIcon = playButton.querySelector('.pause-icon');
+        if (playIcon && pauseIcon) {
+            playIcon.style.display = isPlaying ? 'none' : 'block';
+            pauseIcon.style.display = isPlaying ? 'block' : 'none';
+        }
+    }
 }
