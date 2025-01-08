@@ -253,7 +253,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle likes with session management
     async function likePodcast(podcastId) {
+        // Prevent multiple likes by checking localStorage
+        if (likedPodcasts.has(podcastId.toString())) {
+            showToast('Already liked this podcast', 'error');
+            return;
+        }
+
         try {
+            // Disable all like buttons for this podcast immediately
+            const likeBtns = document.querySelectorAll(`[data-podcast-id="${podcastId}"]`);
+            likeBtns.forEach(btn => {
+                btn.disabled = true;
+                btn.style.pointerEvents = 'none';
+            });
+
             const response = await fetch(`/like/${podcastId}`, {
                 method: 'POST',
                 headers: {
@@ -265,19 +278,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             
             if (response.ok) {
-                const likeBtns = document.querySelectorAll(`[data-podcast-id="${podcastId}"]`);
+                // Add to liked set and save to localStorage
+                likedPodcasts.add(podcastId.toString());
+                localStorage.setItem('likedPodcasts', JSON.stringify([...likedPodcasts]));
+
                 likeBtns.forEach(btn => {
                     const likesCount = btn.querySelector('.likes-count');
                     if (likesCount) {
                         likesCount.textContent = data.likes;
                         btn.classList.add('text-red-500');
-                        setTimeout(() => {
-                            btn.classList.remove('text-red-500');
-                        }, 200);
+                        // Keep the red color to indicate liked state
+                        btn.classList.add('liked');
                     }
                 });
             } else {
-                // Show error toast notification
+                // Re-enable buttons if there's an error
+                likeBtns.forEach(btn => {
+                    btn.disabled = false;
+                    btn.style.pointerEvents = 'auto';
+                });
                 showToast(data.error, 'error');
             }
         } catch (error) {
@@ -344,6 +363,16 @@ document.addEventListener('DOMContentLoaded', () => {
     window.sharePodcast = sharePodcast;
     window.updateViewCount = updateViewCount;
     window.embedPodcast = embedPodcast;
+
+    // Initialize like button states
+    likedPodcasts.forEach(podcastId => {
+        const likeBtns = document.querySelectorAll(`[data-podcast-id="${podcastId}"]`);
+        likeBtns.forEach(btn => {
+            btn.disabled = true;
+            btn.style.pointerEvents = 'none';
+            btn.classList.add('text-red-500', 'liked');
+        });
+    });
 });
 
 // Add this new function for toast notifications
@@ -465,3 +494,6 @@ function showAdminToast(message, type = 'success') {
         toast.style.opacity = '0';
     }, 3000);
 }
+
+// Add at the beginning of your player.js file, after DOMContentLoaded
+const likedPodcasts = new Set(JSON.parse(localStorage.getItem('likedPodcasts') || '[]'));
