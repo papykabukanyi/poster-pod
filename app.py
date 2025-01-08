@@ -1,5 +1,5 @@
 # app.py
-from flask import Flask, render_template, request, jsonify, abort, session
+from flask import Flask, render_template, request, jsonify, abort, session, make_response
 import cloudinary
 import cloudinary.uploader
 import os
@@ -13,6 +13,7 @@ from config import *
 app = Flask(__name__)
 app.config.from_object('config')
 app.secret_key = os.urandom(24)
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB limit
 
 # Initialize SQLAlchemy
 engine = create_engine(SQLALCHEMY_DATABASE_URI)
@@ -54,7 +55,6 @@ def timeago(date):
 
 app.jinja_env.filters['timeago'] = timeago
 
-# app.py (updated Podcast model only - rest remains the same)
 class Podcast(Base):
     __tablename__ = 'podcasts'
     
@@ -65,7 +65,7 @@ class Podcast(Base):
     duration = Column(Float)
     likes = Column(Integer, default=0)
     views = Column(Integer, default=0)
-    embed_data = Column(JSON, default={}, nullable=True)  # Made nullable
+    embed_data = Column(JSON, default={}, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -91,24 +91,6 @@ def index():
         db_session.rollback()
         return "An error occurred loading the podcasts. Please try again.", 500
 
-# Rest of the routes remain the same as in your original app.py
-
-def init_db():
-    # Import all modules here that might define models
-    Base.metadata.create_all(bind=engine)
-    print("Database initialized successfully!")
-
-@app.teardown_appcontext
-def shutdown_session(exception=None):
-    db_session.remove()
-    
-# Add new route for view counting
-@app.route('/views/<int:podcast_id>', methods=['POST'])
-def increment_views(podcast_id):
-    podcast = Podcast.query.get_or_404(podcast_id)
-    podcast.views += 1
-    db_session.commit()
-    return jsonify({'views': podcast.views})
 @app.route('/admin')
 def admin():
     podcasts = Podcast.query.order_by(Podcast.created_at.desc()).all()
@@ -116,19 +98,26 @@ def admin():
 
 @app.route('/like/<int:podcast_id>', methods=['POST'])
 def like_podcast(podcast_id):
-    podcast = Podcast.query.get_or_404(podcast_id)
-    
-    # Check if user has already liked this podcast
-    session_likes = session.get('likes', {})
-    if str(podcast_id) in session_likes:
-        return jsonify({'error': 'Already liked'}), 400
-    
-    podcast.likes += 1
-    session_likes[str(podcast_id)] = True
-    session['likes'] = session_likes
-    
-    db_session.commit()
-    return jsonify({'likes': podcast.likes})
+    try:
+        podcast = Podcast.query.get(podcast_id)
+        if not podcast:
+            return jsonify({'error': 'Podcast not found'}), 404
+        
+        session_likes = session.get('likes', {})
+        if str(podcast_id) in session_likes:
+            return jsonify({'error': 'Already liked'}), 400
+        
+        podcast.likes += 1
+        session_likes[str(podcast_id)] = True
+        session['likes'] = session_likes
+        
+        db_session.commit()
+        
+        return jsonify({'likes': podcast.likes})
+    except Exception as e:
+        db_session.rollback()
+        print(f"Error in like_podcast: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/upload', methods=['POST'])
 def upload_podcast():
@@ -139,17 +128,14 @@ def upload_podcast():
     title = request.form.get('title', 'Untitled Podcast')
     description = request.form.get('description', '')
     
-    if file and file.filename.endswith(('.mp3', '.wav')):
+    if file and file.filename.endswith(('.mp3', '.wav', '.m4a')):
         try:
-            # Upload to Cloudinary
             result = cloudinary.uploader.upload(
                 file,
                 resource_type="auto",
-                folder="podcasts/",
-                format="mp3"
+                folder="podcasts/"
             )
             
-            # Create new podcast entry
             podcast = Podcast(
                 title=title,
                 description=description,
@@ -167,12 +153,12 @@ def upload_podcast():
     
     return jsonify({'error': 'Invalid file type'}), 400
 
-# Update single podcast route to handle metadata
 @app.route('/podcast/<int:podcast_id>')
 def single_podcast(podcast_id):
-    podcast = Podcast.query.get_or_404(podcast_id)
+    podcast = Podcast.query.get(podcast_id)
+    if not podcast:
+        abort(404, description="Podcast not found")
     
-    # Update metadata for social media players
     metadata = {
         'title': podcast.title,
         'description': podcast.description,
@@ -187,15 +173,36 @@ def single_podcast(podcast_id):
     
     return render_template('single_podcast.html', podcast=podcast)
 
-# Add embed route for social media players
 @app.route('/embed/<int:podcast_id>')
 def embed_podcast(podcast_id):
+    try:
+        podcast = Podcast.query.get_or_404(podcast_id)
+        response = make_response(render_template('embed.html', podcast=podcast))
+        # Allow embedding on any domain
+        response.headers['X-Frame-Options'] = 'ALLOWALL'
+        return response
+    except Exception as e:
+        print(f"Error in embed_podcast: {e}")
+        return "Error loading podcast player", 500
+
+@app.route('/views/<int:podcast_id>', methods=['POST'])
+def increment_views(podcast_id):
     podcast = Podcast.query.get_or_404(podcast_id)
-    return render_template('embed.html', podcast=podcast)
+    podcast.views += 1
+    db_session.commit()
+    return jsonify({'views': podcast.views})
 
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({'status': 'healthy'}), 200
+
+def init_db():
+    Base.metadata.create_all(bind=engine)
+    print("Database initialized successfully!")
+
+@app.teardown_appcontext
+def shutdown_session(exception=None):
+    db_session.remove()
 
 if __name__ == '__main__':
     init_db()  # Initialize the database before running the app

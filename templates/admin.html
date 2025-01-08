@@ -8,7 +8,7 @@
     <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
         <h2 class="text-2xl font-semibold mb-4">Upload New Podcast</h2>
         
-        <form id="uploadForm" class="space-y-6">
+        <form id="uploadForm" class="space-y-6" method="POST" enctype="multipart/form-data">
             <div>
                 <label class="block text-sm font-medium text-gray-700">Title</label>
                 <input type="text" name="title" required
@@ -22,8 +22,8 @@
             </div>
             
             <div>
-                <label class="block text-sm font-medium text-gray-700">Audio File (MP3 or WAV)</label>
-                <input type="file" name="audio" accept=".mp3,.wav" required
+                <label class="block text-sm font-medium text-gray-700">Audio File (MP3, WAV, M4A)</label>
+                <input type="file" name="audio" accept=".mp3,.wav,.m4a" required
                     class="mt-1 block w-full">
             </div>
             

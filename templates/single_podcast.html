@@ -67,14 +67,23 @@
 
 <!-- Social Media Embed Metadata -->
 {% block head_extra %}
+<!-- Open Graph -->
 <meta property="og:title" content="{{ podcast.title }} - Poster Podcast">
 <meta property="og:description" content="{{ podcast.description }}">
 <meta property="og:type" content="music.song">
+<meta property="og:url" content="{{ request.url }}">
 <meta property="og:audio" content="{{ podcast.audio_url }}">
 <meta property="og:audio:type" content="audio/mpeg">
-<meta property="twitter:card" content="player">
-<meta property="twitter:player" content="{{ url_for('single_podcast', podcast_id=podcast.id, _external=True) }}">
-<meta property="twitter:player:width" content="480">
-<meta property="twitter:player:height" content="80">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="player">
+<meta name="twitter:site" content="@PosterPodcast">
+<meta name="twitter:title" content="{{ podcast.title }}">
+<meta name="twitter:description" content="{{ podcast.description }}">
+<meta name="twitter:player" content="{{ url_for('embed_podcast', podcast_id=podcast.id, _external=True) }}">
+<meta name="twitter:player:width" content="480">
+<meta name="twitter:player:height" content="120">
+<meta name="twitter:player:stream" content="{{ podcast.audio_url }}">
+<meta name="twitter:player:stream:content_type" content="audio/mpeg">
 {% endblock %}
 {% endblock %}

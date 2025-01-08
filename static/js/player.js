@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const audio = player.querySelector('audio');
         const container = player.querySelector('.waveform-container');
         const playButton = player.querySelector('.play-button');
+
         const volumeSlider = player.querySelector('.volume-slider');
 
         if (!audio || !container) return;
@@ -129,10 +130,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 credentials: 'same-origin'
             });
             
+            const data = await response.json();
+            
             if (response.ok) {
-                const data = await response.json();
                 const likeBtns = document.querySelectorAll(`[data-podcast-id="${podcastId}"]`);
-                
                 likeBtns.forEach(btn => {
                     const likesCount = btn.querySelector('.likes-count');
                     if (likesCount) {
@@ -143,34 +144,43 @@ document.addEventListener('DOMContentLoaded', () => {
                         }, 200);
                     }
                 });
-            } else if (response.status === 400) {
-                console.log('Already liked this podcast');
+            } else {
+                // Show error toast notification
+                showToast(data.error, 'error');
             }
         } catch (error) {
             console.error('Error:', error);
+            showToast('An error occurred while liking the podcast', 'error');
         }
     }
 
     // Share functionality with social media preview
-    function sharePodcast(podcastId) {
+    async function sharePodcast(podcastId) {
         const shareUrl = `${window.location.origin}/podcast/${podcastId}`;
         
-        if (navigator.share) {
-            navigator.share({
-                title: document.title,
-                text: 'Check out this podcast!',
-                url: shareUrl
-            }).catch(console.error);
-        } else {
-            navigator.clipboard.writeText(shareUrl).then(() => {
-                const notification = document.getElementById('shareNotification');
-                if (notification) {
-                    notification.classList.add('share-notification-show');
-                    setTimeout(() => {
-                        notification.classList.remove('share-notification-show');
-                    }, 3000);
-                }
-            });
+        try {
+            if (navigator.share) {
+                // Mobile native share
+                await navigator.share({
+                    title: document.title,
+                    text: 'Check out this podcast!',
+                    url: shareUrl
+                });
+                showToast('Shared successfully!');
+            } else {
+                // Copy to clipboard fallback
+                await navigator.clipboard.writeText(shareUrl);
+                showToast('Link copied to clipboard!');
+            }
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                console.warn('Share canceled by user, copying link to clipboard');
+                await navigator.clipboard.writeText(shareUrl);
+                showToast('Link copied to clipboard!');
+            } else {
+                console.error('Error sharing:', err);
+                showToast('Failed to share podcast', 'error');
+            }
         }
     }
 
@@ -212,4 +222,62 @@ document.addEventListener('DOMContentLoaded', () => {
     window.likePodcast = likePodcast;
     window.sharePodcast = sharePodcast;
     window.updateViewCount = updateViewCount;
+
+    const uploadForm = document.getElementById('uploadForm');
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(uploadForm);
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    alert('Podcast uploaded successfully!');
+                    window.location.reload();
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Error uploading podcast:', error);
+                alert('An error occurred while uploading the podcast.');
+            }
+        });
+    }
 });
+
+// Add this new function for toast notifications
+function showToast(message, type = 'success') {
+    // Remove existing toast if present
+    const existingToast = document.querySelector('.toast-notification');
+    if (existingToast) {
+        existingToast.remove();
+    }
+
+    // Create new toast
+    const toast = document.createElement('div');
+    toast.className = `toast-notification fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow-lg transform transition-all duration-300 z-50 ${
+        type === 'error' ? 'bg-red-500' : 'bg-green-500'
+    } text-white`;
+    toast.style.transform = 'translateY(100%)';
+    toast.style.opacity = '0';
+    toast.textContent = message;
+
+    // Add to DOM
+    document.body.appendChild(toast);
+
+    // Trigger animation
+    setTimeout(() => {
+        toast.style.transform = 'translateY(0)';
+        toast.style.opacity = '1';
+    }, 100);
+
+    // Remove after 3 seconds
+    setTimeout(() => {
+        toast.style.transform = 'translateY(100%)';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}

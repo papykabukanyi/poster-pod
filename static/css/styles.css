@@ -459,3 +459,27 @@
 wave {
     height: 40px !important;
 }
+
+.toast-notification {
+    opacity: 0;
+    transform: translateY(100%);
+    transition: all 0.3s ease-in-out;
+    background-color: black !important; /* Force black background */
+    color: #A4A5A6 !important; /* Use the app's standard gray text color */
+    border: 1px solid #333333; /* Add subtle border */
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Override error state */
+.toast-notification.bg-red-500 {
+    background-color: black !important;
+    border-color: #EF4444; /* Red border for error state */
+}
+
+/* Override success state */
+.toast-notification.bg-green-500 {
+    background-color: black !important;
+    border-color: #10B981; /* Green border for success state */
+}
