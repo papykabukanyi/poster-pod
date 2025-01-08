@@ -1,8 +1,9 @@
+# app.py
 from flask import Flask, render_template, request, jsonify, abort, session
 import cloudinary
 import cloudinary.uploader
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, JSON
 from sqlalchemy.orm import scoped_session, sessionmaker, declarative_base
 from datetime import datetime
 import json
@@ -10,17 +11,12 @@ from config import *
 
 # Initialize Flask app
 app = Flask(__name__)
-
-# Load configuration
 app.config.from_object('config')
-# Set a secret key for session management
 app.secret_key = os.urandom(24)
 
-# Initialize SQLAlchemy with the new style
+# Initialize SQLAlchemy
 engine = create_engine(SQLALCHEMY_DATABASE_URI)
-db_session = scoped_session(sessionmaker(autocommit=False,
-                                         autoflush=False,
-                                         bind=engine))
+db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 
 Base = declarative_base()
 Base.query = db_session.query_property()
@@ -56,10 +52,9 @@ def timeago(date):
         return f"{int(minutes)}m ago"
     return "just now"
 
-# Register the filter with Jinja2 after app initialization
 app.jinja_env.filters['timeago'] = timeago
 
-# Update the Podcast model
+# app.py (updated Podcast model only - rest remains the same)
 class Podcast(Base):
     __tablename__ = 'podcasts'
     
@@ -70,7 +65,7 @@ class Podcast(Base):
     duration = Column(Float)
     likes = Column(Integer, default=0)
     views = Column(Integer, default=0)
-    metadata = Column(Text, default='{}')
+    embed_data = Column(JSON, default={}, nullable=True)  # Made nullable
     created_at = Column(DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -82,9 +77,21 @@ class Podcast(Base):
             'duration': self.duration,
             'likes': self.likes,
             'views': self.views,
-            'metadata': json.loads(self.metadata) if self.metadata else {},
+            'embed_data': self.embed_data if self.embed_data else {},
             'created_at': self.created_at.isoformat()
         }
+
+@app.route('/')
+def index():
+    try:
+        podcasts = Podcast.query.order_by(Podcast.created_at.desc()).all()
+        return render_template('index.html', podcasts=podcasts)
+    except Exception as e:
+        print(f"Error in index route: {e}")
+        db_session.rollback()
+        return "An error occurred loading the podcasts. Please try again.", 500
+
+# Rest of the routes remain the same as in your original app.py
 
 def init_db():
     # Import all modules here that might define models
@@ -102,12 +109,6 @@ def increment_views(podcast_id):
     podcast.views += 1
     db_session.commit()
     return jsonify({'views': podcast.views})
-
-@app.route('/')
-def index():
-    podcasts = Podcast.query.order_by(Podcast.created_at.desc()).all()
-    return render_template('index.html', podcasts=podcasts)
-
 @app.route('/admin')
 def admin():
     podcasts = Podcast.query.order_by(Podcast.created_at.desc()).all()
