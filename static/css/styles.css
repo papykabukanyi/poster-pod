@@ -4,6 +4,7 @@
     --plyr-audio-controls-background: #e7e7e7;
     --plyr-audio-control-color: #374151;
     --plyr-audio-control-color-hover: #7c7c7c;
+    margin-top: 1rem;
 }
 
 .plyr--audio {
@@ -185,30 +186,40 @@
 /* styles.css */
 /* WaveSurfer Styles */
 .waveform-container {
-    background: #2a2a2a;
-    border-radius: 8px;
+    height: 40px;
+    min-width: 200px;
+    background: transparent;
+    border-radius: 4px;
     padding: 10px;
     margin: 10px 0;
     position: relative;
+    cursor: pointer;
+    transition: opacity 0.3s ease;
 }
 
 .waveform-container canvas {
     width: 100% !important;
 }
 
+.waveform-container:hover {
+    opacity: 0.8;
+}
+
 /* Custom Player Controls */
 .audio-player {
     background: #1a1a1a;
     border-radius: 8px;
-    padding: 15px;
+    padding: 1rem;
     margin-top: 10px;
 }
 
 .controls {
     display: flex;
     align-items: center;
+    gap: 1rem;
+    padding: 0.5rem;
     justify-content: space-between;
-    padding: 10px 0;
+    align-items: center;
 }
 
 .play-button {
@@ -218,10 +229,12 @@
     padding: 8px;
     border-radius: 50%;
     transition: background-color 0.3s ease;
+    transition: transform 0.2s ease;
 }
 
 .play-button:hover {
     background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.1);
 }
 
 .play-button svg {

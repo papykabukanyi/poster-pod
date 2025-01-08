@@ -1,81 +1,110 @@
+// Remove the direct import and use CDN
+const WaveformPath = window.WaveformPath;
+
 document.addEventListener('DOMContentLoaded', () => {
-    // Preloader animation
-    setTimeout(() => {
-        const preloader = document.getElementById('preloader');
-        if (preloader) {
+    // Preloader handling
+    const preloader = document.getElementById('preloader');
+    if (preloader) {
+        setTimeout(() => {
             preloader.style.opacity = '0';
-            preloader.style.transition = 'opacity 0.3s ease';
             setTimeout(() => {
                 preloader.style.display = 'none';
             }, 300);
-        }
-    }, 1500);
+        }, 1500);
+    }
 
-    // Initialize WaveSurfer for all audio players
-    const players = document.querySelectorAll('.plyr');
+    // Initialize players
+    const players = document.querySelectorAll('.audio-player');
     let activePlayer = null;
     const wavesurfers = [];
 
     players.forEach((player, index) => {
-        // Create waveform container
-        const waveformContainer = document.createElement('div');
-        waveformContainer.className = 'waveform-container';
-        player.parentElement.appendChild(waveformContainer);
+        const audio = player.querySelector('audio');
+        const container = player.querySelector('.waveform-container');
+        const playButton = player.querySelector('.play-button');
+        const volumeSlider = player.querySelector('.volume-slider');
+
+        if (!audio || !container) return;
+
+        // Create canvas for gradient
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Define gradients
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height * 1.35);
+        gradient.addColorStop(0, '#656666');
+        gradient.addColorStop(0.7, '#656666');
+        gradient.addColorStop(0.7, '#ffffff');
+        gradient.addColorStop(0.72, '#B1B1B1');
+        gradient.addColorStop(1, '#B1B1B1');
+
+        const progressGradient = ctx.createLinearGradient(0, 0, 0, canvas.height * 1.35);
+        progressGradient.addColorStop(0, '#EE772F');
+        progressGradient.addColorStop(0.7, '#EB4926');
+        progressGradient.addColorStop(0.7, '#ffffff');
+        progressGradient.addColorStop(0.72, '#F6B094');
+        progressGradient.addColorStop(1, '#F6B094');
 
         // Initialize WaveSurfer
         const wavesurfer = WaveSurfer.create({
-            container: waveformContainer,
-            waveColor: '#4a5568',
-            progressColor: '#ffffff',
-            cursorColor: '#718096',
-            barWidth: 2,
-            barHeight: 1,
-            responsive: true,
+            container: container,
+            waveColor: '#A4A5A6',
+            progressColor: '#4a4a4a',
+            url: audio.src,
             height: 40,
-            barGap: 2,
-            normalize: true,
-            interact: true
+            barWidth: 2,
+            barGap: 1,
+            barRadius: 3
         });
 
-        // Load audio
-        const audioSource = player.querySelector('source').src;
-        wavesurfer.load(audioSource);
         wavesurfers.push(wavesurfer);
 
-        // Handle play/pause
-        wavesurfer.on('play', () => {
+        // Handle play button click
+        playButton.addEventListener('click', () => {
             if (activePlayer && activePlayer !== wavesurfer) {
                 activePlayer.pause();
+                const activeIndex = wavesurfers.indexOf(activePlayer);
+                if (activeIndex !== -1) {
+                    updatePlayIcon(activeIndex, false);
+                }
             }
+            wavesurfer.playPause();
             activePlayer = wavesurfer;
+        });
+
+        // Handle volume changes
+        volumeSlider.addEventListener('input', (e) => {
+            wavesurfer.setVolume(parseFloat(e.target.value));
+        });
+
+        // Update play button state
+        wavesurfer.on('play', () => {
             updatePlayIcon(index, true);
+            activePlayer = wavesurfer;
         });
 
         wavesurfer.on('pause', () => {
             updatePlayIcon(index, false);
         });
 
-        // Update localStorage with current time
-        wavesurfer.on('audioprocess', () => {
-            localStorage.setItem(`podcast-${audioSource}`, wavesurfer.getCurrentTime());
+        wavesurfer.on('finish', () => {
+            updatePlayIcon(index, false);
+            activePlayer = null;
         });
-
-        // Resume from last position
-        wavesurfer.on('ready', () => {
-            const lastPosition = localStorage.getItem(`podcast-${audioSource}`);
-            if (lastPosition) {
-                wavesurfer.setCurrentTime(parseFloat(lastPosition));
-            }
-        });
-
-        // Handle play button click
-        const playButton = player.parentElement.querySelector('.play-button');
-        if (playButton) {
-            playButton.addEventListener('click', () => {
-                wavesurfer.playPause();
-            });
-        }
     });
+
+    // Helper function to update play icon
+    function updatePlayIcon(index, isPlaying) {
+        const playButton = document.querySelectorAll('.play-button')[index];
+        if (playButton) {
+            const playIcon = playButton.querySelector('.play-icon');
+            const pauseIcon = playButton.querySelector('.pause-icon');
+            if (playIcon && pauseIcon) {
+                playIcon.style.display = isPlaying ? 'none' : 'block';
+                pauseIcon.style.display = isPlaying ? 'block' : 'none';
+            }
+        }
+    }
 
     // Update view count
     function updateViewCount(podcastId) {
@@ -194,16 +223,3 @@ document.addEventListener('DOMContentLoaded', () => {
     window.sharePodcast = sharePodcast;
     window.updateViewCount = updateViewCount;
 });
-
-// Helper function to update play icon
-function updatePlayIcon(index, isPlaying) {
-    const playButton = document.querySelectorAll('.play-button')[index];
-    if (playButton) {
-        const playIcon = playButton.querySelector('.play-icon');
-        const pauseIcon = playButton.querySelector('.pause-icon');
-        if (playIcon && pauseIcon) {
-            playIcon.style.display = isPlaying ? 'none' : 'block';
-            pauseIcon.style.display = isPlaying ? 'block' : 'none';
-        }
-    }
-}

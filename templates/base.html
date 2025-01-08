@@ -24,8 +24,10 @@
     
     <!-- Styles and Scripts -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
-    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="https://unpkg.com/waveform-path@1.1.0/dist/waveform-path.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@7"></script>
+    <script type="module" src="{{ url_for('static', filename='js/player.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body class="bg-[#A4A5A6] min-h-screen flex flex-col">
     <header class="py-6 text-center transition-all duration-300">
@@ -41,6 +43,5 @@
         <p class="text-black text-[8px]">Discover and enjoy free podcasts on Poster Podcast. Explore fascinating topics today!</p>
     </footer>
 
-    <script src="/static/js/player.js"></script>
 </body>
 </html>
