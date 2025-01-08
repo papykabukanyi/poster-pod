@@ -11,6 +11,11 @@
     padding: 0.5rem !important; /* Reduced padding */
     margin-top: 5px !important; /* Reduced margin */
     min-height: 60px !important; /* Compact height */
+    margin: 0.5rem 0;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    min-height: 40px;
 }
 
 .plyr--audio {
@@ -205,11 +210,19 @@
     height: 80px; /* Adjust height as needed */
     background-color: #1a1a1a; /* Background color for the waveform container */
     overflow: hidden;
+    flex: 1;
+    min-width: 0; /* Prevent flex item overflow */
+    height: 40px;
+    position: relative;
+    margin: 0 8px;
+    background: transparent;
 }
 
 .waveform-container canvas {
     width: 100% !important;
     height: 40px !important; /* Match container height */
+    height: 100% !important;
+    max-width: 100%;
 }
 
 .waveform-container:hover #hover {
@@ -223,6 +236,15 @@
     padding: 0.5rem !important; /* Reduced padding */
     margin-top: 5px !important; /* Reduced margin */
     min-height: 60px !important; /* Compact height */
+    position: relative;
+    background: #1a1a1a;
+    border-radius: 8px;
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    min-height: 40px;
 }
 
 .controls {
@@ -232,6 +254,12 @@
     padding: 0.25rem !important; /* Reduced padding */
     justify-content: space-between;
     align-items: center;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 0 4px;
+    height: 40px;
 }
 
 .play-button {
@@ -242,6 +270,13 @@
     border-radius: 50%;
     transition: background-color 0.3s ease;
     transition: transform 0.2s ease;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .play-button:hover {
@@ -253,6 +288,8 @@
     width: 20px !important; /* Smaller icons */
     height: 20px !important;
     fill: #A4A5A6;
+    width: 20px;
+    height: 20px;
 }
 
 .play-button .play-icon,
@@ -285,6 +322,10 @@
     background: #4a4a4a;
     border-radius: 2px;
     outline: none;
+    flex-shrink: 0;
+    width: 60px;
+    max-width: 60px;
+    height: 4px;
 }
 
 .volume-slider::-webkit-slider-thumb {
@@ -333,6 +374,13 @@
     .volume-control {
         display: none;
     }
+    .audio-player {
+        padding: 0.25rem;
+    }
+    
+    .controls {
+        gap: 4px;
+    }
 }
 
 /* Animation for play button */
@@ -363,6 +411,14 @@
     background: rgba(255, 255, 255, 0.5);
     opacity: 0;
     transition: opacity 0.2s ease;
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0;
+    background: rgba(255, 255, 255, 0.1);
+    pointer-events: none;
+    transition: opacity 0.2s ease;
 }
 #waveform:hover #hover {
     opacity: 1;
@@ -377,14 +433,26 @@
     color: #A4A5A6;  /* Light gray color */
     background: transparent;  /* Remove black background */
     font-family: monospace;  /* For better number alignment */
+    position: absolute;
+    z-index: 11;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: #A4A5A6;
+    background: transparent;
+    padding: 2px 4px;
+    font-family: monospace;
+    pointer-events: none;
 }
 
 #time {
     left: 4px;  /* Slight padding from edge */
+    left: 4px;
 }
 
 #duration {
     right: 4px;  /* Slight padding from edge */
+    right: 4px;
 }
 
 /* Update WaveSurfer colors */
