@@ -69,30 +69,19 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const uploadForm = document.getElementById('uploadForm');
-    const uploadButton = document.getElementById('uploadButton');
-    const uploadSpinner = uploadButton.querySelector('.upload-spinner');
-    const buttonText = uploadButton.querySelector('span');
-    const podcastList = document.getElementById('podcastList');
-    let isUploading = false;
-
     if (uploadForm) {
+        let isSubmitting = false;
+        
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            // Prevent duplicate submissions
-            if (isUploading) {
-                console.log('Upload already in progress');
-                return;
-            }
-
-            const formData = new FormData(uploadForm);
+            if (isSubmitting) return;
+            isSubmitting = true;
             
             try {
-                isUploading = true;
-                uploadButton.disabled = true;
-                uploadSpinner.classList.remove('hidden');
-                buttonText.textContent = 'Uploading...';
-
+                const formData = new FormData(uploadForm);
+                formData.append('timestamp', Date.now().toString());
+                
                 const response = await fetch('/upload', {
                     method: 'POST',
                     body: formData
@@ -101,10 +90,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
                 
                 if (response.ok) {
-                    const newPodcastElement = createPodcastElement(data);
-                    podcastList.insertAdjacentHTML('afterbegin', newPodcastElement);
                     showAdminToast('Podcast uploaded successfully!', 'success');
                     uploadForm.reset();
+                    // Reload the page after successful upload
+                    window.location.reload();
                 } else {
                     throw new Error(data.error || 'Upload failed');
                 }
@@ -112,15 +101,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Upload error:', error);
                 showAdminToast(error.message || 'Upload failed', 'error');
             } finally {
-                isUploading = false;
-                uploadButton.disabled = false;
-                uploadSpinner.classList.add('hidden');
-                buttonText.textContent = 'Upload Podcast';
+                isSubmitting = false;
             }
         });
     }
 
-    // Delete podcast handler
+    // Add delete podcast functionality
     window.deletePodcast = async (podcastId) => {
         if (confirm('Are you sure you want to delete this podcast?')) {
             try {
@@ -132,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 if (response.ok) {
+                    // Remove the podcast element from DOM
                     const podcastElement = document.querySelector(`[data-podcast-id="${podcastId}"]`);
                     if (podcastElement) {
                         podcastElement.remove();
@@ -148,54 +135,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    function createPodcastElement(podcast) {
-        const createdAt = new Date(podcast.created_at);
-        const timeAgo = formatTimeAgo(createdAt); // We'll add this helper function
-
-        return `
-            <div class="podcast-item bg-black rounded-lg p-4 border border-gray-800" data-podcast-id="${podcast.id}">
-                <div class="flex flex-col space-y-2">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h3 class="text-[#A4A5A6] font-medium">${podcast.title}</h3>
-                            <span class="text-xs text-gray-500">${timeAgo}</span>
-                        </div>
-                        <button onclick="deletePodcast(${podcast.id})" class="text-red-500 hover:text-red-600 ml-4">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    function formatTimeAgo(date) {
-        const now = new Date();
-        const diffTime = Math.abs(now - date);
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
-        const diffMinutes = Math.floor(diffTime / (1000 * 60));
-
-        if (diffDays > 365) {
-            const years = Math.floor(diffDays / 365);
-            return `${years}y ago`;
-        } else if (diffDays > 30) {
-            const months = Math.floor(diffDays / 30);
-            return `${months}mo ago`;
-        } else if (diffDays > 0) {
-            return `${diffDays}d ago`;
-        } else if (diffHours > 0) {
-            return `${diffHours}h ago`;
-        } else if (diffMinutes > 0) {
-            return `${diffMinutes}m ago`;
-        }
-        return 'just now';
-    }
-
-    function showAdminToast(message, type = 'success') {
+    // Add showAdminToast if not already defined
+    window.showAdminToast = function(message, type = 'success') {
         const toast = document.getElementById('adminToast');
+        if (!toast) return;
+
         toast.className = `fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow-lg transform transition-all duration-300 z-50 ${
             type === 'error' ? 'bg-red-500' : 'bg-green-500'
         } text-white`;
@@ -207,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
             toast.style.transform = 'translateY(100%)';
             toast.style.opacity = '0';
         }, 3000);
-    }
+    };
 });
 </script>
 {% endblock %}

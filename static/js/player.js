@@ -10,6 +10,67 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1500);
     }
 
+    // Single source of truth for upload handling
+    let isUploading = false;
+    const uploadForm = document.getElementById('uploadForm');
+    
+    if (uploadForm) {
+        // Remove any existing event listeners
+        uploadForm.replaceWith(uploadForm.cloneNode(true));
+        const newUploadForm = document.getElementById('uploadForm');
+        const uploadButton = newUploadForm.querySelector('#uploadButton');
+        const uploadSpinner = uploadButton.querySelector('.upload-spinner');
+        const buttonText = uploadButton.querySelector('span');
+
+        newUploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (isUploading) {
+                console.log('Upload already in progress');
+                return;
+            }
+
+            try {
+                isUploading = true;
+                uploadButton.disabled = true;
+                uploadSpinner.classList.remove('hidden');
+                buttonText.textContent = 'Uploading...';
+
+                const formData = new FormData(newUploadForm);
+                
+                // Add timestamp to prevent duplicate uploads
+                formData.append('timestamp', Date.now().toString());
+
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const podcastList = document.getElementById('podcastList');
+                    if (podcastList) {
+                        const newPodcastElement = createPodcastElement(data);
+                        podcastList.insertAdjacentHTML('afterbegin', newPodcastElement);
+                    }
+                    showAdminToast('Podcast uploaded successfully!', 'success');
+                    newUploadForm.reset();
+                } else {
+                    throw new Error(data.error || 'Upload failed');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                showAdminToast(error.message || 'Upload failed', 'error');
+            } finally {
+                isUploading = false;
+                uploadButton.disabled = false;
+                uploadSpinner.classList.add('hidden');
+                buttonText.textContent = 'Upload Podcast';
+            }
+        });
+    }
+
     // Initialize players
     const players = document.querySelectorAll('.audio-player');
     let activeWavesurfer = null; // Track currently playing wavesurfer
@@ -63,9 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Play/pause handling with single player logic
         playButton.addEventListener('click', () => {
             if (activeWavesurfer && activeWavesurfer !== wavesurfer) {
-                // Stop currently playing audio
                 activeWavesurfer.pause();
-                // Reset play/pause button of previously playing audio
                 const activePlayers = document.querySelectorAll('.audio-player');
                 activePlayers.forEach(p => {
                     const btn = p.querySelector('.play-button');
@@ -130,6 +189,43 @@ document.addEventListener('DOMContentLoaded', () => {
         container.addEventListener('pointermove', (e) => {
             hover.style.width = `${e.offsetX}px`;
         });
+
+        let hasStartedPlaying = false;
+        let hasCompletedPlay = false;
+        let startTime = 0;
+        const podcastId = player.querySelector('[data-view-count]')?.getAttribute('data-view-count');
+
+        // Handle play event
+        wavesurfer.on('play', () => {
+            activeWavesurfer = wavesurfer;
+            if (!hasStartedPlaying && wavesurfer.getCurrentTime() < 1) {
+                hasStartedPlaying = true;
+                startTime = wavesurfer.getCurrentTime();
+            }
+        });
+
+        // Handle finish event
+        wavesurfer.on('finish', () => {
+            playButton.querySelector('.play-icon').classList.remove('hidden');
+            playButton.querySelector('.pause-icon').classList.add('hidden');
+            activeWavesurfer = null;
+
+            // Only count view if played from near beginning to end
+            const duration = wavesurfer.getDuration();
+            if (hasStartedPlaying && !hasCompletedPlay && startTime < 1 && podcastId) {
+                hasCompletedPlay = true;
+                updateViewCount(podcastId);
+            }
+        });
+
+        // Reset flags when seeking to beginning
+        wavesurfer.on('seek', (position) => {
+            if (position === 0) {
+                hasStartedPlaying = false;
+                hasCompletedPlay = false;
+                startTime = 0;
+            }
+        });
     });
 
     // Update view count
@@ -144,10 +240,11 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .then(response => response.json())
             .then(data => {
-                const viewCount = document.querySelector(`[data-view-count="${podcastId}"]`);
-                if (viewCount) {
-                    viewCount.textContent = `${data.views} listens`;
-                }
+                // Update all instances of this podcast's view count
+                const viewCounts = document.querySelectorAll(`[data-view-count="${podcastId}"]`);
+                viewCounts.forEach(viewCount => {
+                    viewCount.textContent = `${data.views} plays`;
+                });
                 localStorage.setItem(viewKey, 'true');
             })
             .catch(console.error);
@@ -247,56 +344,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.sharePodcast = sharePodcast;
     window.updateViewCount = updateViewCount;
     window.embedPodcast = embedPodcast;
-
-    const uploadForm = document.getElementById('uploadForm');
-    if (uploadForm) {
-        uploadForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            // Prevent duplicate submissions
-            if (isUploading) return;
-            isUploading = true;
-            
-            // Show loading state
-            uploadSpinner.classList.remove('hidden');
-            buttonText.textContent = 'Uploading...';
-            uploadButton.disabled = true;
-
-            const formData = new FormData(uploadForm);
-            
-            try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    // Add new podcast to list
-                    const newPodcastElement = createPodcastElement(data);
-                    podcastList.insertAdjacentHTML('afterbegin', newPodcastElement);
-                    
-                    // Show success message
-                    showAdminToast('Podcast uploaded successfully!', 'success');
-                    
-                    // Reset form
-                    uploadForm.reset();
-                } else {
-                    showAdminToast(data.error || 'Upload failed', 'error');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                showAdminToast('Upload failed', 'error');
-            } finally {
-                // Reset states
-                isUploading = false;
-                uploadSpinner.classList.add('hidden');
-                buttonText.textContent = 'Upload Podcast';
-                uploadButton.disabled = false;
-            }
-        });
-    }
 });
 
 // Add this new function for toast notifications
@@ -355,3 +402,66 @@ async function embedPodcast(podcastId) {
 
 // Add to window object
 window.embedPodcast = embedPodcast;
+
+// Add at the top level, after the DOMContentLoaded listener declaration
+function createPodcastElement(podcast) {
+    const createdAt = new Date(podcast.created_at);
+    const timeAgo = formatTimeAgo(createdAt);
+
+    return `
+        <div class="podcast-item bg-black rounded-lg p-4 border border-gray-800" data-podcast-id="${podcast.id}">
+            <div class="flex flex-col space-y-2">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-[#A4A5A6] font-medium">${podcast.title}</h3>
+                        <span class="text-xs text-gray-500">${timeAgo}</span>
+                    </div>
+                    <button onclick="deletePodcast(${podcast.id})" class="text-red-500 hover:text-red-600 ml-4">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function formatTimeAgo(date) {
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+    const diffMinutes = Math.floor(diffTime / (1000 * 60));
+
+    if (diffDays > 365) {
+        return `${Math.floor(diffDays / 365)}y ago`;
+    } else if (diffDays > 30) {
+        return `${Math.floor(diffDays / 30)}mo ago`;
+    } else if (diffDays > 0) {
+        return `${diffDays}d ago`;
+    } else if (diffHours > 0) {
+        return `${diffHours}h ago`;
+    } else if (diffMinutes > 0) {
+        return `${diffMinutes}m ago`;
+    }
+    return 'just now';
+}
+
+// Replace showToast with showAdminToast in the upload form handler
+function showAdminToast(message, type = 'success') {
+    const toast = document.getElementById('adminToast');
+    if (!toast) return;
+
+    toast.className = `fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow-lg transform transition-all duration-300 z-50 ${
+        type === 'error' ? 'bg-red-500' : 'bg-green-500'
+    } text-white`;
+    toast.textContent = message;
+    toast.style.transform = 'translateY(0)';
+    toast.style.opacity = '1';
+
+    setTimeout(() => {
+        toast.style.transform = 'translateY(100%)';
+        toast.style.opacity = '0';
+    }, 3000);
+}

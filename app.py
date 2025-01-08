@@ -136,35 +136,33 @@ def upload_podcast():
     file = request.files['audio']
     title = request.form.get('title', 'Untitled Podcast')
     description = request.form.get('description', '')
+    timestamp = request.form.get('timestamp')
+    
+    upload_key = f"upload_{title}_{timestamp}"
+    if upload_key in session:
+        return jsonify({'error': 'Duplicate upload detected'}), 400
     
     if file and file.filename.endswith(('.mp3', '.wav', '.m4a')):
         try:
-            # Generate a unique ID for the file
-            unique_id = f"podcast_{datetime.utcnow().timestamp()}_{os.urandom(8).hex()}"
+            # Set upload flag in session
+            session[upload_key] = True
             
-            # Check if a podcast with same title exists within last minute
-            recent_duplicate = Podcast.query.filter(
-                Podcast.title == title,
-                Podcast.created_at >= datetime.utcnow() - timedelta(minutes=1)
-            ).first()
+            # Generate unique ID
+            unique_id = f"podcast_{int(datetime.utcnow().timestamp())}_{os.urandom(8).hex()}"
             
-            if recent_duplicate:
-                return jsonify({'error': 'A podcast with this title was just uploaded'}), 400
-            
-            # Upload to Cloudinary with unique ID
+            # Upload to Cloudinary
             result = uploader.upload(
                 file,
                 resource_type="auto",
                 folder="podcasts/",
                 public_id=unique_id,
-                overwrite=False,  # Prevent overwriting
-                unique_filename=True  # Ensure unique filename
+                overwrite=False,
+                unique_filename=True
             )
             
             if not result or 'secure_url' not in result:
                 raise Exception("Upload failed")
             
-            # Create podcast instance
             podcast = Podcast(
                 title=title,
                 description=description,
@@ -176,10 +174,14 @@ def upload_podcast():
             db_session.add(podcast)
             db_session.commit()
             
+            # Clear upload flag after successful upload
+            session.pop(upload_key, None)
+            
             return jsonify(podcast.to_dict()), 200
             
         except Exception as e:
             db_session.rollback()
+            session.pop(upload_key, None)  # Clear flag on error
             print(f"Upload error: {str(e)}")
             if 'result' in locals() and result.get('public_id'):
                 try:
