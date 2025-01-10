@@ -14,7 +14,7 @@ from cloudinary import uploader
 app = Flask(__name__)
 app.config.from_object('config')
 app.secret_key = os.urandom(24)
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB limit
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB limit
 
 # Initialize SQLAlchemy
 engine = create_engine(SQLALCHEMY_DATABASE_URI)
@@ -27,7 +27,8 @@ Base.query = db_session.query_property()
 cloudinary.config(
     cloud_name=CLOUDINARY_CLOUD_NAME,
     api_key=CLOUDINARY_API_KEY,
-    api_secret=CLOUDINARY_API_SECRET
+    api_secret=CLOUDINARY_API_SECRET,
+    secure=True
 )
 
 # Timeago filter
@@ -97,9 +98,10 @@ def index():
 @app.route('/admin')
 def admin():
     try:
-        # Get podcasts ordered by creation date (newest first)
+        # Add MIME types validation
+        allowed_extensions = {'.mp3', '.wav', '.m4a'}
         podcasts = Podcast.query.order_by(Podcast.created_at.desc()).all()
-        return render_template('admin.html', podcasts=podcasts)
+        return render_template('admin.html', podcasts=podcasts, allowed_extensions=allowed_extensions)
     except Exception as e:
         print(f"Error in admin route: {e}")
         db_session.rollback()
@@ -130,67 +132,95 @@ def like_podcast(podcast_id):
 
 @app.route('/upload', methods=['POST'])
 def upload_podcast():
-    if 'audio' not in request.files:
-        return jsonify({'error': 'No audio file'}), 400
-    
-    file = request.files['audio']
-    title = request.form.get('title', 'Untitled Podcast')
-    description = request.form.get('description', '')
-    timestamp = request.form.get('timestamp')
-    
-    upload_key = f"upload_{title}_{timestamp}"
-    if upload_key in session:
-        return jsonify({'error': 'Duplicate upload detected'}), 400
-    
-    if file and file.filename.endswith(('.mp3', '.wav', '.m4a')):
-        try:
-            # Set upload flag in session
-            session[upload_key] = True
+    try:
+        if 'audio' not in request.files:
+            return jsonify({'error': 'No audio file uploaded'}), 400
+        
+        file = request.files['audio']
+        if not file.filename:
+            return jsonify({'error': 'No file selected'}), 400
             
+        title = request.form.get('title', '').strip()
+        if not title:
+            return jsonify({'error': 'Title is required'}), 400
+            
+        description = request.form.get('description', '').strip()
+        timestamp = request.form.get('timestamp')
+        
+        # Validate file type
+        allowed_extensions = {'.mp3', '.wav', '.m4a'}
+        file_ext = os.path.splitext(file.filename)[1].lower()
+        if file_ext not in allowed_extensions:
+            return jsonify({'error': 'Invalid file type. Only MP3, WAV, and M4A files are allowed'}), 400
+        
+        upload_key = f"upload_{title}_{timestamp}"
+        if upload_key in session:
+            return jsonify({'error': 'Duplicate upload detected'}), 400
+        
+        session[upload_key] = True
+        
+        try:
             # Generate unique ID
             unique_id = f"podcast_{int(datetime.utcnow().timestamp())}_{os.urandom(8).hex()}"
             
             # Upload to Cloudinary
-            result = uploader.upload(
+            upload_result = uploader.upload(
                 file,
-                resource_type="auto",
+                resource_type="video",  # Use video type for audio files
                 folder="podcasts/",
                 public_id=unique_id,
-                overwrite=False,
-                unique_filename=True
+                overwrite=True,
+                unique_filename=True,
+                chunk_size=20000000,  # 20MB chunks for large files
+                timeout=120,  # Increased timeout for large files
+                eager=[  # Add transcoding options
+                    {"raw_convert": "mp3", "quality": "70"}
+                ]
             )
             
-            if not result or 'secure_url' not in result:
-                raise Exception("Upload failed")
+            if not upload_result or 'secure_url' not in upload_result:
+                raise Exception("Cloudinary upload failed")
             
+            # Create new podcast
             podcast = Podcast(
                 title=title,
                 description=description,
-                audio_url=result['secure_url'],
-                duration=result.get('duration', 0),
-                cloudinary_public_id=result['public_id']
+                audio_url=upload_result['secure_url'],
+                duration=upload_result.get('duration', 0),
+                cloudinary_public_id=upload_result['public_id'],
+                views=0,
+                likes=0,
+                created_at=datetime.utcnow()
             )
             
             db_session.add(podcast)
             db_session.commit()
             
-            # Clear upload flag after successful upload
             session.pop(upload_key, None)
             
-            return jsonify(podcast.to_dict()), 200
+            return jsonify({
+                'success': True,
+                'message': 'Upload successful',
+                'podcast': podcast.to_dict()
+            }), 200
             
         except Exception as e:
-            db_session.rollback()
-            session.pop(upload_key, None)  # Clear flag on error
-            print(f"Upload error: {str(e)}")
-            if 'result' in locals() and result.get('public_id'):
+            if 'upload_result' in locals() and upload_result.get('public_id'):
                 try:
-                    uploader.destroy(result['public_id'], resource_type="video")
+                    uploader.destroy(upload_result['public_id'], resource_type="video")
                 except Exception as ce:
                     print(f"Cloudinary cleanup error: {ce}")
-            return jsonify({'error': 'Upload failed'}), 500
-    
-    return jsonify({'error': 'Invalid file type'}), 400
+            raise e
+            
+    except Exception as e:
+        db_session.rollback()
+        if 'upload_key' in locals():
+            session.pop(upload_key, None)
+        print(f"Upload error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Upload failed. Please try again.'
+        }), 500
 
 @app.route('/podcast/<int:podcast_id>')
 def single_podcast(podcast_id):
@@ -235,10 +265,19 @@ def embed_podcast(podcast_id):
 
 @app.route('/views/<int:podcast_id>', methods=['POST'])
 def increment_views(podcast_id):
-    podcast = Podcast.query.get_or_404(podcast_id)
-    podcast.views += 1
-    db_session.commit()
-    return jsonify({'views': podcast.views})
+    try:
+        # Use get() instead of get_or_404()
+        podcast = Podcast.query.get(podcast_id)
+        if not podcast:
+            return jsonify({'error': 'Podcast not found'}), 404
+            
+        podcast.views += 1
+        db_session.commit()
+        return jsonify({'views': podcast.views})
+    except Exception as e:
+        db_session.rollback()
+        print(f"Error incrementing views: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/podcast/<int:podcast_id>', methods=['DELETE'])
 def delete_podcast(podcast_id):
@@ -306,6 +345,14 @@ def init_db():
         print("Database initialized successfully!")
     except Exception as e:
         print(f"Error initializing database: {e}")
+
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    return jsonify({'error': 'File too large. Maximum size is 100MB'}), 413
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    return jsonify({'error': 'Internal server error. Please try again later'}), 500
 
 @app.teardown_appcontext
 def shutdown_session(exception=None):

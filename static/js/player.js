@@ -32,41 +32,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 isUploading = true;
-                uploadButton.disabled = true;
-                uploadSpinner.classList.remove('hidden');
-                buttonText.textContent = 'Uploading...';
-
-                const formData = new FormData(newUploadForm);
-                
-                // Add timestamp to prevent duplicate uploads
-                formData.append('timestamp', Date.now().toString());
-
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    const podcastList = document.getElementById('podcastList');
-                    if (podcastList) {
-                        const newPodcastElement = createPodcastElement(data);
-                        podcastList.insertAdjacentHTML('afterbegin', newPodcastElement);
-                    }
-                    showAdminToast('Podcast uploaded successfully!', 'success');
-                    newUploadForm.reset();
-                } else {
-                    throw new Error(data.error || 'Upload failed');
-                }
-            } catch (error) {
-                console.error('Upload error:', error);
-                showAdminToast(error.message || 'Upload failed', 'error');
+                // Upload logic here...
             } finally {
                 isUploading = false;
-                uploadButton.disabled = false;
-                uploadSpinner.classList.add('hidden');
-                buttonText.textContent = 'Upload Podcast';
             }
         });
     }
@@ -75,6 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const players = document.querySelectorAll('.audio-player');
     let activeWavesurfer = null; // Track currently playing wavesurfer
     const wavesurfers = [];
+    let currentPlayingIndex = -1;
+    const playedInSession = new Set();
 
     players.forEach((player, index) => {
         const audio = player.querySelector('audio');
@@ -123,6 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Play/pause handling with single player logic
         playButton.addEventListener('click', () => {
+            const podcastId = player.closest('.rounded-lg').querySelector('[data-view-count]')?.getAttribute('data-view-count');
+            
             if (activeWavesurfer && activeWavesurfer !== wavesurfer) {
                 activeWavesurfer.pause();
                 const activePlayers = document.querySelectorAll('.audio-player');
@@ -133,12 +105,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
 
+            // Check if podcast is not playing and hasn't been played in this session
+            if (!wavesurfer.isPlaying() && podcastId && !playedInSession.has(podcastId)) {
+                // Update view count immediately before playing
+                updateViewCount(podcastId);
+                playedInSession.add(podcastId);
+            }
+
             wavesurfer.playPause();
             playButton.querySelector('.play-icon').classList.toggle('hidden');
             playButton.querySelector('.pause-icon').classList.toggle('hidden');
             
             if (wavesurfer.isPlaying()) {
                 activeWavesurfer = wavesurfer;
+                currentPlayingIndex = index;
             } else {
                 activeWavesurfer = null;
             }
@@ -159,7 +139,37 @@ document.addEventListener('DOMContentLoaded', () => {
         wavesurfer.on('finish', () => {
             playButton.querySelector('.play-icon').classList.remove('hidden');
             playButton.querySelector('.pause-icon').classList.add('hidden');
-            activeWavesurfer = null;
+            
+            // Remove this podcast from playedInSession when it finishes
+            // This allows for a new view count when replayed
+            const podcastId = player.closest('.rounded-lg').querySelector('[data-view-count]')?.getAttribute('data-view-count');
+            if (podcastId) {
+                playedInSession.delete(podcastId);
+            }
+            
+            const nextIndex = (currentPlayingIndex + 1) % players.length;
+            const nextPlayer = players[nextIndex];
+            const nextWavesurfer = wavesurfers[nextIndex];
+            const nextPlayButton = nextPlayer.querySelector('.play-button');
+            const nextPodcastId = nextPlayer.closest('.rounded-lg').querySelector('[data-view-count]')?.getAttribute('data-view-count');
+
+            if (nextWavesurfer) {
+                // Reset current player
+                activeWavesurfer = null;
+                currentPlayingIndex = nextIndex;
+
+                // Update view count before playing next
+                if (!playedInSession.has(nextPodcastId) && nextPodcastId) {
+                    updateViewCount(nextPodcastId);
+                    playedInSession.add(nextPodcastId);
+                }
+
+                // Start next player
+                nextWavesurfer.play();
+                nextPlayButton.querySelector('.play-icon').classList.add('hidden');
+                nextPlayButton.querySelector('.pause-icon').classList.remove('hidden');
+                activeWavesurfer = nextWavesurfer;
+            }
         });
 
         // Volume control
@@ -263,6 +273,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Update view count
     function updateViewCount(podcastId) {
+        // Update UI immediately
+        const viewCounts = document.querySelectorAll(`[data-view-count="${podcastId}"]`);
+        viewCounts.forEach(viewCount => {
+            const currentViews = parseInt(viewCount.textContent);
+            viewCount.textContent = `${currentViews + 1} plays`;
+        });
+
+        // Send request to server
         fetch(`/views/${podcastId}`, {
             method: 'POST',
             headers: {
@@ -271,10 +289,12 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .then(response => response.json())
         .then(data => {
-            const viewCounts = document.querySelectorAll(`[data-view-count="${podcastId}"]`);
-            viewCounts.forEach(viewCount => {
-                viewCount.textContent = `${data.views} plays`;
-            });
+            // Update with server count if different
+            if (data.views) {
+                viewCounts.forEach(viewCount => {
+                    viewCount.textContent = `${data.views} plays`;
+                });
+            }
         })
         .catch(console.error);
     }
@@ -524,3 +544,7 @@ function showAdminToast(message, type = 'success') {
 
 // Add at the beginning of your player.js file, after DOMContentLoaded
 const likedPodcasts = new Set(JSON.parse(localStorage.getItem('likedPodcasts') || '[]'));
+
+// Add these at the top level, after the DOMContentLoaded listener declaration
+let currentPlayingIndex = -1;
+const playedInSession = new Set();

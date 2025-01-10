@@ -22,9 +22,33 @@
             </div>
             
             <div>
-                <label class="block text-sm font-medium text-[#A4A5A6]">Audio File (MP3, WAV, M4A)</label>
-                <input type="file" name="audio" accept=".mp3,.wav,.m4a" required
-                    class="mt-1 block w-full text-[#A4A5A6] file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-500 file:text-white hover:file:bg-purple-600">
+                <label class="block text-sm font-medium text-[#A4A5A6]">Audio File (MP3, WAV, M4A - Max 500MB)</label>
+                <input type="file" 
+                       name="audio" 
+                       accept=".mp3,.wav,.m4a" 
+                       required
+                       class="mt-1 block w-full text-[#A4A5A6] file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-purple-500 file:text-white hover:file:bg-purple-600"
+                       onchange="validateFile(this)">
+                <p class="mt-1 text-sm text-gray-500">Supported formats: MP3, WAV, M4A</p>
+                <script>
+                    function validateFile(input) {
+                        const file = input.files[0];
+                        if (file) {
+                            if (file.size > 500 * 1024 * 1024) {
+                                showAdminToast('File size exceeds 500MB limit', 'error');
+                                input.value = '';
+                                return;
+                            }
+                            
+                            const validTypes = ['.mp3', '.wav', '.m4a'];
+                            const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+                            if (!validTypes.includes(fileExtension)) {
+                                showAdminToast('Invalid file type. Only MP3, WAV, and M4A files are allowed', 'error');
+                                input.value = '';
+                            }
+                        }
+                    }
+                </script>
             </div>
             
             <div class="flex items-center justify-between">
@@ -36,7 +60,9 @@
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                 </button>
-                <span id="uploadProgress" class="text-[#A4A5A6] text-sm hidden">Uploading... <span class="progress-value">0%</span></span>
+                <div id="uploadProgress" class="text-[#A4A5A6] text-sm hidden">
+                    Uploading... please wait
+                </div>
             </div>
         </form>
     </div>
@@ -69,31 +95,61 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const uploadForm = document.getElementById('uploadForm');
+    const uploadButton = document.getElementById('uploadButton');
+    const uploadSpinner = document.querySelector('.upload-spinner');
+    const buttonText = uploadButton.querySelector('span');
+    const uploadProgress = document.getElementById('uploadProgress');
+
     if (uploadForm) {
-        let isSubmitting = false;
-        
+        let isUploading = false;
+
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            if (isSubmitting) return;
-            isSubmitting = true;
-            
+            if (isUploading) {
+                console.log('Upload already in progress');
+                return;
+            }
+
+            // Validate file size
+            const audioFile = uploadForm.querySelector('input[type="file"]').files[0];
+            if (audioFile && audioFile.size > 500 * 1024 * 1024) { // 500MB limit
+                showAdminToast('File size exceeds 500MB limit', 'error');
+                return;
+            }
+
             try {
+                isUploading = true;
+                uploadButton.disabled = true;
+                uploadSpinner.classList.remove('hidden');
+                buttonText.textContent = 'Uploading...';
+                uploadProgress.classList.remove('hidden');
+
                 const formData = new FormData(uploadForm);
                 formData.append('timestamp', Date.now().toString());
-                
+
                 const response = await fetch('/upload', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (response.ok) {
                     showAdminToast('Podcast uploaded successfully!', 'success');
                     uploadForm.reset();
-                    // Reload the page after successful upload
-                    window.location.reload();
+                    
+                    // Add the new podcast to the list without page reload
+                    if (data.podcast) {
+                        const podcastList = document.getElementById('podcastList');
+                        const podcastElement = createPodcastElement(data.podcast);
+                        podcastList.insertAdjacentHTML('afterbegin', podcastElement);
+                    }
+
+                    // Optional: Reload page after success
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
                 } else {
                     throw new Error(data.error || 'Upload failed');
                 }
@@ -101,41 +157,68 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Upload error:', error);
                 showAdminToast(error.message || 'Upload failed', 'error');
             } finally {
-                isSubmitting = false;
+                isUploading = false;
+                uploadButton.disabled = false;
+                uploadSpinner.classList.add('hidden');
+                buttonText.textContent = 'Upload Podcast';
+                uploadProgress.classList.add('hidden');
             }
         });
     }
 
-    // Add delete podcast functionality
-    window.deletePodcast = async (podcastId) => {
-        if (confirm('Are you sure you want to delete this podcast?')) {
-            try {
-                const response = await fetch(`/podcast/${podcastId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
+    // Function to create podcast element
+    function createPodcastElement(podcast) {
+        return `
+            <div class="podcast-item bg-black rounded-lg p-4 border border-gray-800" data-podcast-id="${podcast.id}">
+                <div class="flex flex-col space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-[#A4A5A6] font-medium">${podcast.title}</h3>
+                            <span class="text-xs text-gray-500">just now</span>
+                        </div>
+                        <button onclick="deletePodcast(${podcast.id})" class="text-red-500 hover:text-red-600 ml-4">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
 
-                if (response.ok) {
-                    // Remove the podcast element from DOM
-                    const podcastElement = document.querySelector(`[data-podcast-id="${podcastId}"]`);
-                    if (podcastElement) {
-                        podcastElement.remove();
-                        showAdminToast('Podcast deleted successfully', 'success');
-                    }
-                } else {
-                    const data = await response.json();
-                    showAdminToast(data.error || 'Failed to delete podcast', 'error');
+    // Delete podcast function
+    window.deletePodcast = async (podcastId) => {
+        if (!confirm('Are you sure you want to delete this podcast?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/podcast/${podcastId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
                 }
-            } catch (error) {
-                console.error('Error:', error);
-                showAdminToast('Failed to delete podcast', 'error');
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                const podcastElement = document.querySelector(`[data-podcast-id="${podcastId}"]`);
+                if (podcastElement) {
+                    podcastElement.remove();
+                    showAdminToast('Podcast deleted successfully', 'success');
+                }
+            } else {
+                throw new Error(data.error || 'Failed to delete podcast');
             }
+        } catch (error) {
+            console.error('Delete error:', error);
+            showAdminToast(error.message || 'Failed to delete podcast', 'error');
         }
     };
 
-    // Add showAdminToast if not already defined
+    // Toast notification function
     window.showAdminToast = function(message, type = 'success') {
         const toast = document.getElementById('adminToast');
         if (!toast) return;
