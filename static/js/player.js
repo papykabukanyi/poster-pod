@@ -275,6 +275,79 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             totalPlayTime = 0;
         });
+
+        wavesurfer.on('ready', () => {
+            const audioProcessing = initializeAudioProcessing(wavesurfer);
+            
+            // Add processing controls
+            const controls = document.createElement('div');
+            controls.className = 'audio-processing-controls flex items-center space-x-2 mt-2';
+            controls.innerHTML = `
+                <div class="flex items-center">
+                    <label class="text-xs text-[#A4A5A6] mr-2">Bass</label>
+                    <input type="range" class="bass-control w-16" min="0" max="15" value="7" step="0.1">
+                </div>
+                <div class="flex items-center">
+                    <label class="text-xs text-[#A4A5A6] mr-2">Power</label>
+                    <input type="range" class="power-control w-16" min="0" max="2" value="1" step="0.1">
+                </div>
+            `;
+
+            // Add visualization canvas
+            const containerDiv = document.createElement('div');
+            containerDiv.style.position = 'relative';
+            containerDiv.appendChild(audioProcessing.canvas);
+            container.appendChild(containerDiv);
+
+            // Add controls after waveform
+            container.appendChild(controls);
+
+            // Control handlers
+            const bassControl = controls.querySelector('.bass-control');
+            bassControl.addEventListener('input', (e) => {
+                audioProcessing.bassBoost.gain.value = parseFloat(e.target.value);
+            });
+
+            const powerControl = controls.querySelector('.power-control');
+            powerControl.addEventListener('input', (e) => {
+                audioProcessing.gainNode.gain.value = parseFloat(e.target.value);
+            });
+
+            // Preset profiles
+            const presets = {
+                normal: {
+                    bass: 7,
+                    power: 1
+                },
+                bassBoost: {
+                    bass: 12,
+                    power: 1.4
+                },
+                superBass: {
+                    bass: 15,
+                    power: 1.7
+                }
+            };
+
+            // Add preset selector
+            const presetSelect = document.createElement('select');
+            presetSelect.className = 'bg-black text-[#A4A5A6] text-xs ml-2 p-1 rounded';
+            presetSelect.innerHTML = `
+                <option value="normal">Normal</option>
+                <option value="bassBoost">Bass Boost</option>
+                <option value="superBass">Super Bass</option>
+            `;
+
+            presetSelect.addEventListener('change', (e) => {
+                const preset = presets[e.target.value];
+                audioProcessing.bassBoost.gain.value = preset.bass;
+                audioProcessing.gainNode.gain.value = preset.power;
+                bassControl.value = preset.bass;
+                powerControl.value = preset.power;
+            });
+
+            controls.appendChild(presetSelect);
+        });
     });
 
     // Update view count
@@ -554,3 +627,81 @@ const likedPodcasts = new Set(JSON.parse(localStorage.getItem('likedPodcasts') |
 // Add these at the top level, after the DOMContentLoaded listener declaration
 let currentPlayingIndex = -1;
 const playedInSession = new Set();
+
+const initializeAudioProcessing = (wavesurfer) => {
+    // Get Web Audio API context
+    const audioContext = wavesurfer.backend.ac;
+    
+    // Create audio nodes
+    const sourceNode = wavesurfer.backend.mediaElementSource;
+    const analyzerNode = audioContext.createAnalyser();
+    const bassBoost = audioContext.createBiquadFilter();
+    const compressor = audioContext.createDynamicsCompressor();
+    const gainNode = audioContext.createGain();
+
+    // Configure bass boost
+    bassBoost.type = 'lowshelf';
+    bassBoost.frequency.value = 100; // Adjust frequency range for bass
+    bassBoost.gain.value = 7; // Boost bass by 7dB
+
+    // Configure compressor for richer sound
+    compressor.threshold.value = -24;
+    compressor.knee.value = 30;
+    compressor.ratio.value = 12;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.25;
+
+    // Configure analyzer
+    analyzerNode.fftSize = 2048;
+    const bufferLength = analyzerNode.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    // Create processing chain
+    sourceNode
+        .connect(bassBoost)
+        .connect(compressor)
+        .connect(gainNode)
+        .connect(analyzerNode)
+        .connect(audioContext.destination);
+
+    // Add visualization canvas 
+    const canvas = document.createElement('canvas');
+    canvas.width = 200;
+    canvas.height = 40;
+    canvas.style.position = 'absolute';
+    canvas.style.bottom = '0';
+    canvas.style.left = '0';
+    canvas.style.opacity = '0.5';
+    canvas.style.pointerEvents = 'none';
+
+    const canvasCtx = canvas.getContext('2d');
+    
+    // Visualization function
+    const drawVisual = () => {
+        requestAnimationFrame(drawVisual);
+        analyzerNode.getByteFrequencyData(dataArray);
+
+        canvasCtx.fillStyle = 'rgb(0, 0, 0)';
+        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const barWidth = (canvas.width / bufferLength) * 2.5;
+        let barHeight;
+        let x = 0;
+
+        for(let i = 0; i < bufferLength; i++) {
+            barHeight = dataArray[i] / 2;
+            canvasCtx.fillStyle = `rgb(${barHeight + 100},50,50)`;
+            canvasCtx.fillRect(x, canvas.height - barHeight/2, barWidth, barHeight);
+            x += barWidth + 1;
+        }
+    };
+
+    drawVisual();
+
+    return {
+        bassBoost,
+        compressor,
+        gainNode,
+        canvas
+    };
+};
