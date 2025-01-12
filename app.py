@@ -300,14 +300,30 @@ def default_news_image():
 
 @app.route('/news/update-time')
 def get_news_update_time():
-    if NewsService.last_update_time:
+    """Get the next news update time"""
+    try:
+        # If no last update time, use current time
+        if not NewsService.last_update_time:
+            current_time = datetime.utcnow()
+            NewsService.last_update_time = current_time
+        
         next_update = NewsService.last_update_time + timedelta(minutes=30)
+        current_time = datetime.utcnow()
+        
         return jsonify({
             'last_update': NewsService.last_update_time.isoformat(),
             'next_update': next_update.isoformat(),
-            'server_time': datetime.utcnow().isoformat()
+            'server_time': current_time.isoformat()
         })
-    return jsonify({'error': 'No update time available'}), 404
+    except Exception as e:
+        print(f"Error getting update time: {e}")
+        # Return current time + 30 minutes as fallback
+        current_time = datetime.utcnow()
+        return jsonify({
+            'last_update': current_time.isoformat(),
+            'next_update': (current_time + timedelta(minutes=30)).isoformat(),
+            'server_time': current_time.isoformat()
+        })
 
 # Update init_db to include new column
 def init_db():
