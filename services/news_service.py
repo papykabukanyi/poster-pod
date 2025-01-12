@@ -3,6 +3,7 @@ import requests
 import threading
 import time
 from datetime import datetime, timedelta
+from bs4 import BeautifulSoup
 from models.news import NewsArticle
 from models.base import db_session
 from config import NEWSDATA_API_KEY
