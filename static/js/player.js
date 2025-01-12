@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Preloader handling
+    // Preloader handling - add null check
     const preloader = document.getElementById('preloader');
     if (preloader) {
         setTimeout(() => {
@@ -10,38 +10,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1500);
     }
 
-    // Single source of truth for upload handling
+    // Single source of truth for upload handling - add null check
     let isUploading = false;
     const uploadForm = document.getElementById('uploadForm');
     
     if (uploadForm) {
-        // Remove any existing event listeners
-        uploadForm.replaceWith(uploadForm.cloneNode(true));
-        const newUploadForm = document.getElementById('uploadForm');
-        const uploadButton = newUploadForm.querySelector('#uploadButton');
-        const uploadSpinner = uploadButton.querySelector('.upload-spinner');
-        const buttonText = uploadButton.querySelector('span');
+        const uploadButton = uploadForm.querySelector('#uploadButton');
+        // Only proceed if uploadButton exists
+        if (uploadButton) {
+            const uploadSpinner = uploadButton.querySelector('.upload-spinner');
+            const buttonText = uploadButton.querySelector('span');
 
-        newUploadForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            if (isUploading) {
-                console.log('Upload already in progress');
-                return;
-            }
+            // Add the event listener only if all required elements exist
+            uploadForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                if (isUploading) {
+                    console.log('Upload already in progress');
+                    return;
+                }
 
-            try {
-                isUploading = true;
-                // Upload logic here...
-            } finally {
-                isUploading = false;
-            }
-        });
+                try {
+                    isUploading = true;
+                    // Upload logic here...
+                } finally {
+                    isUploading = false;
+                }
+            });
+        }
     }
 
-    // Initialize players
+    // Initialize players - add null check
     const players = document.querySelectorAll('.audio-player');
-    let activeWavesurfer = null; // Track currently playing wavesurfer
+    if (players.length === 0) {
+        // No players found on this page, exit early
+        return;
+    }
+
+    let activeWavesurfer = null;
     const wavesurfers = [];
     let currentPlayingIndex = -1;
     const playedInSession = new Set();
