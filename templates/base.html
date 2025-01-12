@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XQEE2WEF1D"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-XQEE2WEF1D');
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Discover and listen to fascinating podcasts for free on Poster Podcast. Explore diverse topics, connect with your interests, and enjoy a seamless listening experience.">
@@ -58,6 +66,7 @@
     <script src="https://unpkg.com/wavesurfer.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
+
 <body class="bg-[#A4A5A6] min-h-screen flex flex-col">
     <header class="py-6 text-center transition-all duration-300">
         <h1 class="text-4xl font-bold tracking-tight text-black">Poster Podcasts</h1>
