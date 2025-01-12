@@ -13,6 +13,8 @@ NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 # Add to existing config
 UNSPLASH_ACCESS_KEY = os.getenv('UNSPLASH_ACCESS_KEY')
+# Replace NEWS_API_KEY with:
+NEWSDATA_API_KEY = os.getenv('NEWSDATA_API_KEY')
 
 # Database configuration
 SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')

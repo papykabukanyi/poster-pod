@@ -288,10 +288,25 @@ def health_check():
 
 @app.route('/news')
 def news_page():
-    breaking_news = NewsArticle.query.filter_by(is_breaking=True).order_by(NewsArticle.published_at.desc()).first()
-    other_news = NewsArticle.query.filter_by(is_breaking=False).order_by(NewsArticle.published_at.desc()).limit(3).all()
-    
-    return render_template('news.html', breaking_news=breaking_news, other_news=other_news)
+    try:
+        # Force fetch if no news exists
+        if not NewsArticle.query.first():
+            NewsService.fetch_news(force_breaking=True)
+        
+        breaking_news = NewsArticle.query.filter_by(is_breaking=True)\
+                                      .order_by(NewsArticle.published_at.desc())\
+                                      .first()
+        other_news = NewsArticle.query.filter_by(is_breaking=False)\
+                                    .order_by(NewsArticle.published_at.desc())\
+                                    .limit(3)\
+                                    .all()
+        
+        return render_template('news.html', 
+                             breaking_news=breaking_news, 
+                             other_news=other_news)
+    except Exception as e:
+        print(f"Error in news_page: {e}")
+        return "Error loading news", 500
 
 @app.route('/static/images/default-news.jpg')
 def default_news_image():
@@ -300,15 +315,15 @@ def default_news_image():
 
 @app.route('/news/update-time')
 def get_news_update_time():
-    """Get the next news update time"""
     try:
-        # If no last update time, use current time
+        current_time = datetime.utcnow()
+        
         if not NewsService.last_update_time:
-            current_time = datetime.utcnow()
             NewsService.last_update_time = current_time
+            # Force initial fetch
+            NewsService.fetch_news(force_breaking=True)
         
         next_update = NewsService.last_update_time + timedelta(minutes=30)
-        current_time = datetime.utcnow()
         
         return jsonify({
             'last_update': NewsService.last_update_time.isoformat(),
@@ -317,13 +332,21 @@ def get_news_update_time():
         })
     except Exception as e:
         print(f"Error getting update time: {e}")
-        # Return current time + 30 minutes as fallback
         current_time = datetime.utcnow()
         return jsonify({
             'last_update': current_time.isoformat(),
             'next_update': (current_time + timedelta(minutes=30)).isoformat(),
             'server_time': current_time.isoformat()
         })
+
+@app.route('/news/refresh', methods=['GET'])
+def refresh_news():
+    try:
+        NewsService.force_refresh()
+        return jsonify({'status': 'success', 'message': 'News refreshed successfully'})
+    except Exception as e:
+        print(f"Error refreshing news: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # Update init_db to include new column
 def init_db():
