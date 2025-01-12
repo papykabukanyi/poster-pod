@@ -127,7 +127,84 @@
                 min-height: 150px;
             }
         }
+
+        /* Add to existing styles */
+        @media (max-width: 1023px) {
+            .mobile-scroll {
+                height: auto !important;
+            }
+            
+            .h-1\/2 {
+                height: auto !important;
+            }
+            
+            .lg\:h-full {
+                height: 100% !important;
+            }
+        }
+        
+        /* Ensure content visibility */
+        .flex-col {
+            min-height: 0;
+        }
+        
+        /* Improve text readability */
+        .line-clamp-3 {
+            -webkit-line-clamp: 3;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .lg\:line-clamp-4 {
+            -webkit-line-clamp: 4;
+        }
+        
+        /* Maintain spacing */
+        .space-y-2 > * + * {
+            margin-top: 0.5rem;
+        }
+        
+        .space-y-4 > * + * {
+            margin-top: 1rem;
+        }
+        
+        /* Ensure proper image display */
+        .relative {
+            position: relative;
+        }
+        
+        .absolute {
+            position: absolute;
+        }
+        
+        .inset-0 {
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+        }
+        
+        /* Better responsive layout */
+        @media (min-width: 1024px) {
+            .lg\:grid {
+                display: grid;
+                height: 100%;
+            }
+            
+            .lg\:col-span-7 {
+                grid-column: span 7 / span 7;
+            }
+            
+            .lg\:col-span-5 {
+                grid-column: span 5 / span 5;
+            }
+        }
     </style>
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/newsfavicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/newsfavicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/newsfavicon/favicon-16x16.png">
+    <link rel="manifest" href="/static/newsfavicon/site.webmanifest">
 </head>
 <body class="dark bg-custom-bg">
     {% block content %}{% endblock %}

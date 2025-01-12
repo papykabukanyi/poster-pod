@@ -76,27 +76,35 @@
         <div class="flex flex-col gap-4 h-full">
             <!-- Breaking News -->
             {% if breaking_news %}
-            <div class="h-1/2">
+            <div class="h-1/2 mb-4">
                 <a href="{{ breaking_news.url }}" target="_blank" 
                    class="block h-full group hover:no-underline focus:no-underline lg:grid lg:grid-cols-12 bg-gray-50 rounded-lg overflow-hidden">
-                    <img src="{{ breaking_news.image_url }}" 
-                         alt="{{ breaking_news.title }}" 
-                         class="object-cover w-full h-full lg:col-span-7 bg-gray-500">
-                    <div class="p-4 space-y-2 lg:col-span-5 flex flex-col justify-center">
-                        <span class="text-xs font-semibold text-violet-600">BREAKING NEWS</span>
-                        <h3 class="text-lg md:text-xl lg:text-2xl font-semibold group-hover:underline line-clamp-2">
-                            {{ breaking_news.title }}
-                        </h3>
-                        <span class="text-xs text-gray-600">
-                            {{ breaking_news.published_at.strftime('%B %d, %Y') }}
-                        </span>
-                        <p class="text-sm text-gray-800 line-clamp-3">{{ breaking_news.description }}</p>
-                        <span class="inline-flex items-center text-sm text-violet-600 mt-auto">
-                            Read more
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                            </svg>
-                        </span>
+                    <div class="relative lg:col-span-7 h-48 lg:h-full">
+                        <img src="{{ breaking_news.image_url }}" 
+                             alt="{{ breaking_news.title }}" 
+                             class="absolute inset-0 w-full h-full object-cover bg-gray-500">
+                    </div>
+                    <div class="p-4 lg:p-6 lg:col-span-5 flex flex-col min-h-[250px] lg:min-h-0 lg:h-full">
+                        <div class="flex flex-col h-full justify-between space-y-4">
+                            <div class="space-y-2">
+                                <span class="inline-block text-xs font-semibold text-violet-600 mb-2">BREAKING NEWS</span>
+                                <h3 class="text-lg md:text-xl lg:text-2xl font-semibold group-hover:underline">
+                                    {{ breaking_news.title }}
+                                </h3>
+                                <span class="block text-xs text-gray-600">
+                                    {{ breaking_news.published_at.strftime('%B %d, %Y') }}
+                                </span>
+                                <p class="text-sm text-gray-800 line-clamp-3 lg:line-clamp-4">
+                                    {{ breaking_news.description }}
+                                </p>
+                            </div>
+                            <span class="inline-flex items-center text-sm text-violet-600">
+                                Read more
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                </svg>
+                            </span>
+                        </div>
                     </div>
                 </a>
             </div>
