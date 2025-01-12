@@ -348,6 +348,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
             controls.appendChild(presetSelect);
         });
+
+        // Handle volume slider visibility for mobile
+        const waveformContainer = player.querySelector('.waveform-container');
+    
+        function updateLayout() {
+            if (window.innerWidth <= 640) { // Mobile breakpoint
+                if (volumeSlider) {
+                    volumeSlider.style.display = 'none';
+                    // Expand waveform to fill space
+                    waveformContainer.style.flex = '1';
+                    waveformContainer.style.marginRight = '0';
+                }
+            } else {
+                if (volumeSlider) {
+                    volumeSlider.style.display = 'block';
+                    // Reset waveform size
+                    waveformContainer.style.flex = '1';
+                    waveformContainer.style.marginRight = '8px';
+                }
+            }
+        }
+
+        // Initial layout setup
+        updateLayout();
+        
+        // Update layout on resize
+        window.addEventListener('resize', updateLayout);
+
+        // Add CSS to support layout changes
+        const style = document.createElement('style');
+        style.textContent = `
+            @media (max-width: 640px) {
+                .waveform-container {
+                    flex: 1 !important;
+                    margin-right: 0 !important;
+                }
+                .volume-slider {
+                    display: none !important;
+                }
+            }
+        `;
+        document.head.appendChild(style);
     });
 
     // Update view count
@@ -629,27 +671,36 @@ let currentPlayingIndex = -1;
 const playedInSession = new Set();
 
 const initializeAudioProcessing = (wavesurfer) => {
-    // Get Web Audio API context
     const audioContext = wavesurfer.backend.ac;
-    
-    // Create audio nodes
     const sourceNode = wavesurfer.backend.mediaElementSource;
     const analyzerNode = audioContext.createAnalyser();
     const bassBoost = audioContext.createBiquadFilter();
     const compressor = audioContext.createDynamicsCompressor();
     const gainNode = audioContext.createGain();
-
-    // Configure bass boost
+    
+    // Add volume boost node
+    const volumeBoost = audioContext.createGain();
+    volumeBoost.gain.value = 1.05; // 5% volume boost
+    
+    // Configure existing nodes...
     bassBoost.type = 'lowshelf';
-    bassBoost.frequency.value = 100; // Adjust frequency range for bass
-    bassBoost.gain.value = 7; // Boost bass by 7dB
-
-    // Configure compressor for richer sound
+    bassBoost.frequency.value = 100;
+    bassBoost.gain.value = 7;
+    
     compressor.threshold.value = -24;
     compressor.knee.value = 30;
     compressor.ratio.value = 12;
     compressor.attack.value = 0.003;
     compressor.release.value = 0.25;
+    
+    // Modified processing chain to include volume boost
+    sourceNode
+        .connect(bassBoost)
+        .connect(compressor)
+        .connect(gainNode)
+        .connect(volumeBoost)  // Add volume boost to chain
+        .connect(analyzerNode)
+        .connect(audioContext.destination);
 
     // Configure analyzer
     analyzerNode.fftSize = 2048;
