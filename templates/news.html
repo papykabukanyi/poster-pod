@@ -1,0 +1,237 @@
+{% extends "news_base.html" %}
+
+{% block head %}
+<title>International Poster News - Breaking World News & Latest Updates</title>
+<meta name="description" content="Get real-time breaking news, international updates, and latest worldwide coverage. Your trusted source for immediate global news coverage and analysis.">
+<meta name="keywords" content="breaking news, world news, international news, global updates, latest news">
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ request.url }}">
+<meta property="og:title" content="International Poster News - Breaking World News">
+<meta property="og:description" content="Real-time breaking news and international updates. Your trusted source for immediate global news coverage.">
+<meta property="og:image" content="{{ breaking_news.image_url if breaking_news else '/static/images/default-news.jpg' }}">
+
+<!-- Twitter -->
+<meta property="twitter:card" content="summary_large_image">
+<meta property="twitter:url" content="{{ request.url }}">
+<meta property="twitter:title" content="International Poster News - Breaking World News">
+<meta property="twitter:description" content="Real-time breaking news and international updates. Your trusted source for immediate global news coverage.">
+<meta property="twitter:image" content="{{ breaking_news.image_url if breaking_news else '/static/images/default-news.jpg' }}">
+
+<!-- Schema.org markup for Google -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "NewsMediaOrganization",
+  "name": "International Poster News",
+  "url": "{{ request.url_root }}",
+  "description": "Real-time breaking news and international updates.",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "{{ request.url }}"
+  },
+  {% if breaking_news %}
+  "headline": "{{ breaking_news.title }}",
+  "image": "{{ breaking_news.image_url }}",
+  "datePublished": "{{ breaking_news.published_at.isoformat() }}",
+  "dateModified": "{{ breaking_news.published_at.isoformat() }}",
+  {% endif %}
+  "publisher": {
+    "@type": "Organization",
+    "name": "International Poster News",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "{{ request.url_root }}static/images/logo.png"
+    }
+  }
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<!-- Countdown Snackbar -->
+<div id="countdown-snackbar" class="fixed top-4 right-4 z-50 transform transition-transform duration-300 translate-x-full">
+    <div class="flex flex-row pl-4 py-2 gap-2 items-center border rounded-lg shadow overflow-hidden bg-gray-50 border-violet-600">
+        <span class="flex-shrink-0 inline-flex mx-3 item-center justify-center leading-none rounded-full bg-violet-600 text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-8 w-8">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+            </svg>
+        </span>
+        <div class="flex-1 p-2">
+            <p class="text-sm text-gray-800">
+                Next breaking news in: <span id="countdown-timer" class="font-bold">30:00</span>
+            </p>
+        </div>
+        <button type="button" class="ml-6 p-2 text-gray-600" onclick="hideSnackbar()">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+            </svg>
+        </button>
+    </div>
+</div>
+
+<section class="mobile-scroll h-screen">
+    <div class="container max-w-6xl p-4 mx-auto">
+        <div class="flex flex-col gap-4">
+            <!-- Breaking News -->
+            {% if breaking_news %}
+            <div class="lg:h-[500px] h-auto">
+                <a href="{{ breaking_news.url }}" target="_blank" 
+                   class="block group hover:no-underline focus:no-underline lg:grid lg:grid-cols-12 bg-gray-50 rounded-lg overflow-hidden h-full">
+                    <img src="{{ breaking_news.image_url }}" 
+                         alt="{{ breaking_news.title }}" 
+                         class="object-cover w-full h-64 lg:h-full lg:col-span-7 bg-gray-500">
+                    <div class="p-6 space-y-4 lg:col-span-5 flex flex-col justify-center">
+                        <span class="text-xs font-semibold text-violet-600">BREAKING NEWS</span>
+                        <h3 class="text-xl md:text-2xl lg:text-3xl font-semibold group-hover:underline">
+                            {{ breaking_news.title }}
+                        </h3>
+                        <span class="text-xs text-gray-600">
+                            {{ breaking_news.published_at.strftime('%B %d, %Y') }}
+                        </span>
+                        <p class="text-gray-800">{{ breaking_news.description }}</p>
+                        <div class="mt-auto">
+                            <span class="inline-flex items-center text-sm text-violet-600">
+                                Read more
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                </svg>
+                            </span>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% endif %}
+
+            <!-- Other News Grid -->
+            <div class="mobile-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                {% for article in other_news %}
+                <a href="{{ article.url }}" target="_blank" 
+                   class="group hover:no-underline focus:no-underline bg-gray-50 rounded-lg overflow-hidden flex flex-col">
+                    <img class="object-cover w-full h-48 md:h-40" 
+                         src="{{ article.image_url }}"
+                         alt="{{ article.title }}">
+                    <div class="p-6 flex flex-col flex-1">
+                        <h3 class="text-lg font-semibold group-hover:underline mb-2">
+                            {{ article.title }}
+                        </h3>
+                        <p class="text-sm text-gray-800 mb-4">{{ article.description }}</p>
+                        <div class="mt-auto flex items-center justify-between">
+                            <span class="text-xs text-gray-600">
+                                {{ article.published_at.strftime('%B %d') }}
+                            </span>
+                            <span class="inline-flex items-center text-sm text-violet-600">
+                                Read more
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                </svg>
+                            </span>
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        document.getElementById('countdown-snackbar').classList.remove('translate-x-full');
+    }, 1000);
+    
+    initializeCountdown();
+});
+
+function hideSnackbar() {
+    document.getElementById('countdown-snackbar').classList.add('translate-x-full');
+}
+
+function initializeCountdown() {
+    fetch('/news/update-time')
+        .then(response => response.json())
+        .then(data => {
+            const nextUpdate = new Date(data.next_update);
+            const serverTime = new Date(data.server_time);
+            const clientOffset = new Date() - serverTime;
+            
+            function updateTimer() {
+                const now = new Date(Date.now() - clientOffset);
+                const timeLeft = nextUpdate - now;
+                
+                if (timeLeft <= 0) {
+                    location.reload();
+                    return;
+                }
+                
+                const minutes = Math.floor(timeLeft / 60000);
+                const seconds = Math.floor((timeLeft % 60000) / 1000);
+                
+                document.getElementById('countdown-timer').textContent = 
+                    `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }
+            
+            // Update timer immediately and every second
+            updateTimer();
+            const timerInterval = setInterval(updateTimer, 1000);
+            
+            // Store timer info in localStorage
+            localStorage.setItem('newsNextUpdate', nextUpdate.getTime());
+            localStorage.setItem('newsClientOffset', clientOffset);
+        })
+        .catch(() => {
+            // Fallback to localStorage if fetch fails
+            const storedNextUpdate = localStorage.getItem('newsNextUpdate');
+            const storedOffset = localStorage.getItem('newsClientOffset');
+            
+            if (storedNextUpdate && storedOffset) {
+                const nextUpdate = new Date(parseInt(storedNextUpdate));
+                const clientOffset = parseInt(storedOffset);
+                
+                function updateTimer() {
+                    const now = new Date(Date.now() - clientOffset);
+                    const timeLeft = nextUpdate - now;
+                    
+                    if (timeLeft <= 0) {
+                        location.reload();
+                        return;
+                    }
+                    
+                    const minutes = Math.floor(timeLeft / 60000);
+                    const seconds = Math.floor((timeLeft % 60000) / 1000);
+                    
+                    document.getElementById('countdown-timer').textContent = 
+                        `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                }
+                
+                updateTimer();
+                setInterval(updateTimer, 1000);
+            } else {
+                // If no stored data, fall back to 30-minute countdown
+                startFallbackCountdown();
+            }
+        });
+}
+
+function startFallbackCountdown() {
+    let totalSeconds = 1800;
+    const countdown = setInterval(() => {
+        if (totalSeconds <= 0) {
+            clearInterval(countdown);
+            location.reload();
+            return;
+        }
+        
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        
+        document.getElementById('countdown-timer').textContent = 
+            `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            
+        totalSeconds--;
+    }, 1000);
+}
+</script>
+{% endblock %}

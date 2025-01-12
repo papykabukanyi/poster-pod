@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="{{ request.url }}">
+    {% block head %}{% endblock %}
+    <title>International Poster News</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <meta http-equiv="refresh" content="1800"> <!-- Auto refresh every 30 minutes -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        custom: {
+                            bg: '#A4A5A6',
+                            darker: '#939495',
+                            lighter: '#B5B6B7'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @media (min-width: 1024px) {
+            body {
+                overflow: hidden;
+            }
+        }
+        
+        @media (max-width: 1023px) {
+            body {
+                overflow-y: auto;
+            }
+            .mobile-scroll {
+                height: auto !important;
+                min-height: 100vh;
+            }
+            .mobile-grid {
+                height: auto !important;
+            }
+        }
+        
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        #countdown-snackbar {
+            transition: transform 0.3s ease-in-out;
+        }
+        
+        #countdown-snackbar button:hover {
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body class="dark bg-custom-bg">
+    {% block content %}{% endblock %}
+</body>
+</html>

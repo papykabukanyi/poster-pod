@@ -8,4 +8,4 @@ Disallow: /tmp/
 Disallow: /private/
 
 # Specify the location of the sitemap
-Sitemap: https://poster-pod.up.railway.app/sitemap.xml
+Sitemap: https://www.onposter.site/sitemap.xml

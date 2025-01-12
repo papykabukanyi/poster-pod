@@ -2,8 +2,14 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <!-- Home page -->
   <url>
-    <loc>https://poster-pod.up.railway.app/</loc>
-    <lastmod>2025-01-07</lastmod>
+    <loc>https://www.onposter.site/</loc>
+    <lastmod>2025-01-12</lastmod>
+    <priority>1.0</priority>
+  </url>
+  <!-- Home page -->
+  <url>
+    <loc>https://www.onposter.site/news/</loc>
+    <lastmod>2025-01-12</lastmod>
     <priority>1.0</priority>
   </url>
 </urlset>

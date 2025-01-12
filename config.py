@@ -7,6 +7,12 @@ load_dotenv()
 CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME')
 CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY')
 CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET')
+# News API configuration
+NEWS_API_KEY = os.getenv('NEWS_API_KEY')
+# Add to existing config.py
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+# Add to existing config
+UNSPLASH_ACCESS_KEY = os.getenv('UNSPLASH_ACCESS_KEY')
 
 # Database configuration
 SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')

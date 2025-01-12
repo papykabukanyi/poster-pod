@@ -1,28 +1,35 @@
 # app.py
-from flask import Flask, render_template, request, jsonify, abort, session, make_response
+from flask import Flask, render_template, request, jsonify, abort, session, make_response, send_from_directory
 import cloudinary
 import cloudinary.uploader
 import os
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, JSON, text
-from sqlalchemy.orm import scoped_session, sessionmaker, declarative_base
+from sqlalchemy import (
+    Column, 
+    Integer, 
+    String, 
+    DateTime, 
+    Text, 
+    Float, 
+    JSON,
+    text,
+    create_engine, 
+    inspect
+)
+from sqlalchemy.exc import OperationalError
 from datetime import datetime, timedelta
 import json
 from config import *
 from cloudinary import uploader
 from werkzeug.utils import secure_filename
+from models.base import Base, db_session, engine
+from models.news import NewsArticle
+from services.news_service import NewsService
 
 # Initialize Flask app
 app = Flask(__name__)
 app.config.from_object('config')
 app.secret_key = os.urandom(24)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB limit
-
-# Initialize SQLAlchemy
-engine = create_engine(SQLALCHEMY_DATABASE_URI)
-db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
-
-Base = declarative_base()
-Base.query = db_session.query_property()
 
 # Configure Cloudinary
 cloudinary.config(
@@ -279,32 +286,43 @@ def delete_podcast(podcast_id):
 def health_check():
     return jsonify({'status': 'healthy'}), 200
 
+@app.route('/news')
+def news_page():
+    breaking_news = NewsArticle.query.filter_by(is_breaking=True).order_by(NewsArticle.published_at.desc()).first()
+    other_news = NewsArticle.query.filter_by(is_breaking=False).order_by(NewsArticle.published_at.desc()).limit(3).all()
+    
+    return render_template('news.html', breaking_news=breaking_news, other_news=other_news)
+
+@app.route('/static/images/default-news.jpg')
+def default_news_image():
+    # Return a default image for when news images fail to load
+    return send_from_directory('static/images', 'default-news.jpg')
+
+@app.route('/news/update-time')
+def get_news_update_time():
+    if NewsService.last_update_time:
+        next_update = NewsService.last_update_time + timedelta(minutes=30)
+        return jsonify({
+            'last_update': NewsService.last_update_time.isoformat(),
+            'next_update': next_update.isoformat(),
+            'server_time': datetime.utcnow().isoformat()
+        })
+    return jsonify({'error': 'No update time available'}), 404
+
 # Update init_db to include new column
 def init_db():
-    try:
-        # Create tables
-        Base.metadata.create_all(bind=engine)
-        
-        # Add cloudinary_public_id column if it doesn't exist
-        with engine.connect() as connection:
-            connection.execute(text("""
-                DO $$ 
-                BEGIN 
-                    IF NOT EXISTS (
-                        SELECT 1 
-                        FROM information_schema.columns 
-                        WHERE table_name='podcasts' 
-                        AND column_name='cloudinary_public_id'
-                    ) THEN 
-                        ALTER TABLE podcasts 
-                        ADD COLUMN cloudinary_public_id VARCHAR(200);
-                    END IF;
-                END $$;
-            """))
-            connection.commit()
-        print("Database initialized successfully!")
-    except Exception as e:
-        print(f"Error initializing database: {e}")
+    inspector = inspect(engine)
+    
+    # Check if news_articles table exists
+    if not inspector.has_table('news_articles'):
+        try:
+            # Create all tables
+            Base.metadata.create_all(bind=engine)
+            print("Created database tables successfully")
+        except Exception as e:
+            print(f"Error creating tables: {e}")
+            return False
+    return True
 
 @app.errorhandler(413)
 def request_entity_too_large(error):
@@ -318,7 +336,11 @@ def internal_server_error(error):
 def shutdown_session(exception=None):
     db_session.remove()
 
+def init_app(app):
+    with app.app_context():
+        init_db()
+        NewsService.start_scheduler()
+
 if __name__ == '__main__':
-    init_db()  # Initialize the database before running the app
-    port = int(os.environ.get('PORT', 3030))
-    app.run(host='0.0.0.0', port=port)
+    init_app(app)
+    app.run(debug=True)
