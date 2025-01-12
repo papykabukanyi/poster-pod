@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Preloader handling
+    // Preloader handling - Only show on non-admin pages
     const preloader = document.getElementById('preloader');
-    if (preloader) {
+    if (preloader && !window.location.pathname.includes('/admin')) {
         // Start visible
         preloader.style.opacity = '1';
         preloader.style.display = 'flex';
@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 preloader.remove();
             }, 300);
         }, 7000);
+    } else if (preloader && window.location.pathname.includes('/admin')) {
+        // Immediately remove preloader on admin pages
+        preloader.remove();
     }
 
     // Single source of truth for upload handling - add null check
