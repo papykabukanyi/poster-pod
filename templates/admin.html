@@ -5,41 +5,87 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
     <h1 class="text-4xl font-bold text-white mb-8">Admin Dashboard</h1>
     
-    <!-- Simple Upload Form -->
-    <div class="bg-black rounded-lg shadow-lg p-6 mb-8 border border-gray-800">
-        <h2 class="text-2xl font-semibold mb-4 text-[#A4A5A6]">Upload New Podcast</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Upload Form (Left Side) -->
+        <div class="bg-black rounded-lg shadow-lg p-6 border border-gray-800">
+            <h2 class="text-2xl font-semibold mb-4 text-[#A4A5A6]">Upload New Podcast</h2>
         
-        <form id="uploadForm" enctype="multipart/form-data" method="POST" action="/upload">
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-[#A4A5A6]">Title *</label>
-                    <input type="text" name="title" required
-                        class="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-[#A4A5A6]">
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-[#A4A5A6]">Audio File *</label>
-                    <input type="file" name="audio" accept=".mp3,.wav,.m4a" required
-                        class="mt-1 block w-full text-[#A4A5A6]">
-                </div>
+            <form id="uploadForm" enctype="multipart/form-data" method="POST" action="/upload">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-[#A4A5A6]">Title *</label>
+                        <input type="text" name="title" required
+                            class="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-[#A4A5A6]">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-[#A4A5A6]">Audio File *</label>
+                        <input type="file" name="audio" accept=".mp3,.wav,.m4a" required
+                            class="mt-1 block w-full text-[#A4A5A6]">
+                    </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-[#A4A5A6]">Description</label>
-                    <textarea name="description" rows="3"
-                        class="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-[#A4A5A6]"></textarea>
-                </div>
-                
-                <div>
-                    <button type="submit" id="uploadBtn" 
-                        class="w-full bg-purple-600 text-white rounded-md px-4 py-2 hover:bg-purple-700">
-                        Upload Podcast
-                    </button>
-                </div>
+                    <div>
+                        <label class="block text-sm font-medium text-[#A4A5A6]">Description</label>
+                        <textarea name="description" rows="3"
+                            class="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-[#A4A5A6]"></textarea>
+                    </div>
+                    
+                    <div>
+                        <button type="submit" id="uploadBtn" 
+                            class="w-full bg-purple-600 text-white rounded-md px-4 py-2 hover:bg-purple-700">
+                            Upload Podcast
+                        </button>
+                    </div>
 
-                <!-- Error Message Display -->
-                <div id="errorMsg" class="hidden mt-2 text-red-500 text-sm"></div>
+                    <!-- Error Message Display -->
+                    <div id="errorMsg" class="hidden mt-2 text-red-500 text-sm"></div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Podcasts Table (Right Side) -->
+        <div class="bg-black rounded-lg shadow-lg p-6 border border-gray-800">
+            <h2 class="text-2xl font-semibold mb-4 text-[#A4A5A6]">Uploaded Podcasts</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-800">
+                    <thead>
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs text-[#A4A5A6]">Title</th>
+                            <th class="px-4 py-2 text-left text-xs text-[#A4A5A6]">Duration</th>
+                            <th class="px-4 py-2 text-left text-xs text-[#A4A5A6]">Plays</th>
+                            <th class="px-4 py-2 text-left text-xs text-[#A4A5A6]">Likes</th>
+                            <th class="px-4 py-2 text-left text-xs text-[#A4A5A6]">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        {% for podcast in podcasts %}
+                        <tr data-podcast-id="{{ podcast.id }}">
+                            <td class="px-4 py-2 text-sm text-[#A4A5A6]">{{ podcast.title }}</td>
+                            <td class="px-4 py-2 text-sm text-[#A4A5A6]">
+                                {% if podcast.duration %}
+                                    {{ (podcast.duration / 60)|int }}:{{ '%02d'|format((podcast.duration % 60)|int) }}
+                                {% else %}
+                                    --
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-2 text-sm text-[#A4A5A6]">{{ podcast.views }}</td>
+                            <td class="px-4 py-2 text-sm text-[#A4A5A6]">{{ podcast.likes }}</td>
+                            <td class="px-4 py-2 text-sm">
+                                <button 
+                                    onclick="deletePodcast({{ podcast.id }})"
+                                    class="text-red-500 hover:text-red-600">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-        </form>
+        </div>
     </div>
 </div>
 
@@ -94,5 +140,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+// Add this function to handle podcast deletion
+async function deletePodcast(podcastId) {
+    if (!confirm('Are you sure you want to delete this podcast?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/podcast/${podcastId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete podcast');
+        }
+
+        // Remove the row from the table
+        const row = document.querySelector(`tr[data-podcast-id="${podcastId}"]`);
+        if (row) {
+            row.remove();
+        }
+
+    } catch (error) {
+        console.error('Delete error:', error);
+        alert('Failed to delete podcast');
+    }
+}
 </script>
 {% endblock %}

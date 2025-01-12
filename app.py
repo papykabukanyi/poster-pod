@@ -130,7 +130,7 @@ def like_podcast(podcast_id):
 
 @app.route('/upload', methods=['POST'])
 def upload_podcast():
-    print("Upload endpoint hit") # Debug log
+    print("Upload endpoint hit")
     
     if 'audio' not in request.files:
         print("No audio file in request")
@@ -153,33 +153,32 @@ def upload_podcast():
         if file_ext not in allowed_extensions:
             return jsonify({'error': f'Invalid file type. Allowed: {", ".join(allowed_extensions)}'}), 400
 
-        print(f"Uploading file: {file.filename}") # Debug log
-
-        # Upload to Cloudinary
+        # Upload to Cloudinary with resource info
         upload_result = uploader.upload(
             file,
-            resource_type='raw',
+            resource_type='video',  # Use 'video' for audio files
             folder='podcasts'
         )
         
-        print("Cloudinary upload complete") # Debug log
-
-        # Save to database
+        # Extract duration from Cloudinary response
+        duration = upload_result.get('duration', 0)  # Duration in seconds
+        
+        # Save to database with duration
         podcast = Podcast(
             title=title,
             description=request.form.get('description', '').strip(),
             audio_url=upload_result['secure_url'],
-            cloudinary_public_id=upload_result['public_id']
+            cloudinary_public_id=upload_result['public_id'],
+            duration=duration  # Store duration in seconds
         )
         
         db_session.add(podcast)
         db_session.commit()
-        print("Database save complete") # Debug log
 
         return jsonify({'success': True, 'message': 'Upload successful'}), 200
 
     except Exception as e:
-        print(f"Upload error: {e}") # Debug log
+        print(f"Upload error: {e}")
         db_session.rollback()
         return jsonify({'error': str(e)}), 500
 
