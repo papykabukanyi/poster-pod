@@ -528,3 +528,41 @@ wave {
     margin-top: 8px;
     padding-left: 4px;
 }
+
+/* Preloader styles */
+.preloader {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    backdrop-filter: blur(8px);
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s ease;
+}
+
+.rooster-head {
+    width: 120px;
+    height: 120px;
+    animation: heartbeat 1s infinite ease-in-out;
+    filter: drop-shadow(0 0 8px rgba(255,255,255,0.3));
+}
+
+@keyframes heartbeat {
+    0% {
+        transform: scale(1);
+    }
+    14% {
+        transform: scale(1.15);
+    }
+    28% {
+        transform: scale(1);
+    }
+    42% {
+        transform: scale(1.15);
+    }
+    70% {
+        transform: scale(1);
+    }
+}

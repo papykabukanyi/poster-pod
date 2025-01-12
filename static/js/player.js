@@ -1,13 +1,21 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Preloader handling - add null check
+    // Preloader handling
     const preloader = document.getElementById('preloader');
     if (preloader) {
+        // Start visible
+        preloader.style.opacity = '1';
+        preloader.style.display = 'flex';
+        
+        // Set 7 second timeout
         setTimeout(() => {
+            // Fade out
             preloader.style.opacity = '0';
+            
+            // Remove after fade transition
             setTimeout(() => {
-                preloader.style.display = 'none';
+                preloader.remove();
             }, 300);
-        }, 1500);
+        }, 7000);
     }
 
     // Single source of truth for upload handling - add null check
