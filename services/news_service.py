@@ -8,11 +8,13 @@ from models.news import NewsArticle
 from models.base import db_session
 from config import NEWSDATA_API_KEY
 from services.image_service import ImageService
+import hashlib
 
 class NewsService:
     last_update_time = None
     breaking_news_check_interval = 300  # 5 minutes
     last_fetch_time = None
+    seen_articles = set()
     
     @classmethod
     def fetch_news(cls, force_breaking=False):
@@ -83,53 +85,36 @@ class NewsService:
 
     @classmethod
     def _fetch_news(cls, article, is_breaking=False):
-        """Helper method to process a single article"""
+        """Process single article with deduplication"""
         try:
-            # Try to get image from article source first
-            image_url = None
-            if article.get('image_url'):  # NewsData.io image
-                image_url = article['image_url']
-            elif article.get('link'):  # Try to get from article page
-                try:
-                    response = requests.get(article['link'], timeout=5)
-                    if response.status_code == 200:
-                        soup = BeautifulSoup(response.text, 'html.parser')
-                        # Try og:image first
-                        og_image = soup.find('meta', property='og:image')
-                        if og_image and og_image.get('content'):
-                            image_url = og_image['content']
-                        else:
-                            # Try twitter:image
-                            twitter_image = soup.find('meta', property='twitter:image')
-                            if twitter_image and twitter_image.get('content'):
-                                image_url = twitter_image['content']
-                except Exception as e:
-                    print(f"Error getting article image: {e}")
+            # Create unique hash for article based on title and content
+            article_hash = hashlib.md5(
+                f"{article['title']}{article['description']}".encode()
+            ).hexdigest()
+
+            # Skip if we've seen this article
+            if article_hash in cls.seen_articles:
+                return None
+            cls.seen_articles.add(article_hash)
 
             # Generate image path
-            image_path = f"static/images/generated/{'breaking' if is_breaking else 'news'}_{abs(hash(article['title']))}.jpg"
+            image_path = f"static/images/generated/{article_hash}.jpg"
             final_image_path = None
 
-            if image_url:
-                # Save original image
-                try:
-                    img_response = requests.get(image_url, timeout=5)
-                    if img_response.status_code == 200:
-                        os.makedirs(os.path.dirname(image_path), exist_ok=True)
-                        with open(image_path, 'wb') as f:
-                            f.write(img_response.content)
-                        final_image_path = f"/{image_path}"
-                except Exception as e:
-                    print(f"Error saving original image: {e}")
-
-            # If no image was saved, try Unsplash
-            if not final_image_path:
-                generated_image = ImageService.generate_news_image(
-                    article['title'],
-                    save_path=image_path
+            # Try to get image from article
+            if article.get('image_url'):
+                final_image_path = ImageService.get_cached_image(
+                    article['image_url'],
+                    image_path
                 )
-                if generated_image:
-                    final_image_path = f"/{image_path}"
+            
+            # If no image, generate one
+            if not final_image_path:
+                final_image_path = ImageService.generate_news_image(
+                    article['title'],
+                    article['link'],
+                    image_path
+                )
 
             # Create news article
             pub_date = datetime.fromisoformat(article['pubDate'].replace('Z', '+00:00'))
@@ -137,7 +122,7 @@ class NewsService:
                 title=article['title'],
                 description=article['description'],
                 url=article['link'],
-                image_url=final_image_path,
+                image_url=f"/{image_path}" if final_image_path else None,
                 published_at=pub_date,
                 source=article['source_id'],
                 category='breaking' if is_breaking else 'news',

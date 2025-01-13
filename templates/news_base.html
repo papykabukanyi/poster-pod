@@ -59,6 +59,20 @@
             overflow: hidden;
         }
         
+        /* Update the existing snackbar styles */
+        #countdown-snackbar {
+            transition: all 0.3s ease-in-out;
+        }
+
+        @media (max-width: 768px) {
+            #countdown-snackbar {
+                top: auto;
+                bottom: 1rem;
+                right: 1rem;
+                left: 1rem;
+            }
+        }
+
         #countdown-snackbar {
             transition: transform 0.3s ease-in-out;
         }
@@ -199,6 +213,70 @@
             .lg\:col-span-5 {
                 grid-column: span 5 / span 5;
             }
+        }
+
+        /* Add to existing styles */
+        @media (max-width: 768px) {
+            .h-40 {
+                height: 160px !important;
+            }
+            
+            .text-[10px] {
+                font-size: 10px !important;
+            }
+            
+            .text-[11px] {
+                font-size: 11px !important;
+            }
+            
+            /* Adjust spacing for mobile */
+            .p-3 {
+                padding: 0.75rem !important;
+            }
+            
+            .space-y-2 > * + * {
+                margin-top: 0.5rem !important;
+            }
+            
+            /* Enable scrolling only on mobile */
+            body {
+                overflow-y: auto !important;
+            }
+            
+            .h-screen {
+                height: auto !important;
+                min-height: 100vh;
+            }
+        }
+
+        /* Preserve desktop layout */
+        @media (min-width: 769px) {
+            body {
+                overflow: hidden !important;
+            }
+            
+            .h-screen {
+                height: 100vh !important;
+            }
+        }
+
+        /* Fix content heights */
+        .h-full {
+            height: 100%;
+        }
+
+        .flex-col {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Ensure proper spacing */
+        .space-y-2 > * + * {
+            margin-top: 0.5rem;
+        }
+
+        .space-y-4 > * + * {
+            margin-top: 1rem;
         }
     </style>
     <link rel="apple-touch-icon" sizes="180x180" href="/static/newsfavicon/apple-touch-icon.png">

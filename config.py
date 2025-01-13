@@ -18,3 +18,9 @@ NEWSDATA_API_KEY = os.getenv('NEWSDATA_API_KEY')
 
 # Database configuration
 SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
+
+# Image settings
+IMAGE_CACHE_DIR = 'static/images/generated'
+IMAGE_CACHE_TIME = 3600  # 1 hour
+MAX_IMAGE_SIZE = (800, 800)
+IMAGE_QUALITY = 85
