@@ -85,38 +85,40 @@ class NewsService:
 
     @classmethod
     def _fetch_news(cls, article, is_breaking=False):
-        """Process single article with deduplication"""
         try:
-            # Create unique hash for article based on title and content
+            # Create consistent hash for article
             article_hash = hashlib.md5(
                 f"{article['title']}{article['description']}".encode()
             ).hexdigest()
 
-            # Skip if we've seen this article
+            # Skip if duplicate
             if article_hash in cls.seen_articles:
                 return None
             cls.seen_articles.add(article_hash)
 
-            # Generate image path
+            # Generate consistent image path
             image_path = f"static/images/generated/{article_hash}.jpg"
             final_image_path = None
 
-            # Try to get image from article
-            if article.get('image_url'):
-                final_image_path = ImageService.get_cached_image(
-                    article['image_url'],
-                    image_path
-                )
-            
-            # If no image, generate one
-            if not final_image_path:
-                final_image_path = ImageService.generate_news_image(
-                    article['title'],
-                    article['link'],
-                    image_path
-                )
+            # Try to get existing image first
+            if os.path.exists(image_path):
+                final_image_path = image_path
+            else:
+                # Try article image
+                if article.get('image_url'):
+                    final_image_path = ImageService.get_cached_image(
+                        article['image_url'],
+                        image_path
+                    )
+                
+                # Fallback to generated image
+                if not final_image_path:
+                    final_image_path = ImageService.generate_news_image(
+                        article['title'],
+                        article['link'],
+                        image_path
+                    )
 
-            # Create news article
             pub_date = datetime.fromisoformat(article['pubDate'].replace('Z', '+00:00'))
             return NewsArticle(
                 title=article['title'],

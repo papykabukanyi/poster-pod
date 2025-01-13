@@ -17,7 +17,18 @@ class ImageService:
         """Compress image to reduce size while maintaining quality"""
         try:
             img = Image.open(BytesIO(image_data))
-            img.thumbnail(max_size, Image.Resampling.LANCZOS)
+            # Convert RGBA to RGB
+            if img.mode in ('RGBA', 'LA'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                background.paste(img, mask=img.split()[-1])
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
+                
+            # Resize if needed
+            if img.size[0] > max_size[0] or img.size[1] > max_size[1]:
+                img.thumbnail(max_size, Image.Resampling.LANCZOS)
+                
             output = BytesIO()
             img.save(output, format='JPEG', quality=quality, optimize=True)
             return output.getvalue()
@@ -32,39 +43,45 @@ class ImageService:
 
     @classmethod
     def get_cached_image(cls, url, save_path):
-        """Get image from cache or download"""
+        """Get image from cache or download with better error handling"""
         try:
             image_hash = cls.get_image_hash(url)
             current_time = time.time()
-
-            # Check if image is cached and still valid
-            if image_hash in cls.image_cache:
-                cached_data = cls.image_cache[image_hash]
-                if current_time - cached_data['timestamp'] < cls.cache_timeout:
-                    if os.path.exists(cached_data['path']):
-                        return cached_data['path']
-
-            # Download and cache image
-            response = requests.get(url, timeout=5)
-            if response.status_code == 200:
-                # Compress image
-                compressed_data = cls.compress_image(response.content)
-                
-                # Save compressed image
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                with open(save_path, 'wb') as f:
-                    f.write(compressed_data)
-
-                # Update cache
+            
+            # Check filesystem cache first
+            if os.path.exists(save_path):
+                # Update cache metadata
                 cls.image_cache[image_hash] = {
                     'path': save_path,
                     'timestamp': current_time
                 }
                 return save_path
 
+            # Try to download image
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                # Ensure directory exists
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                
+                # Compress and save image
+                compressed_data = cls.compress_image(response.content)
+                if compressed_data:
+                    with open(save_path, 'wb') as f:
+                        f.write(compressed_data)
+                    
+                    # Update cache
+                    cls.image_cache[image_hash] = {
+                        'path': save_path,
+                        'timestamp': current_time
+                    }
+                    return save_path
+
             return None
         except Exception as e:
-            print(f"Error caching image: {e}")
+            print(f"Error caching image from {url}: {e}")
             return None
 
     @staticmethod
@@ -103,15 +120,25 @@ class ImageService:
 
     @classmethod
     def generate_news_image(cls, title, news_url=None, save_path=None):
-        """Generate or get image for news article"""
+        """Generate or get image with better caching"""
         try:
-            # Try to get image from article first
+            # Use hash of title for consistent image naming
+            title_hash = cls.get_image_hash(title)
+            image_path = save_path or f"static/images/generated/{title_hash}.jpg"
+            
+            # Check if image already exists
+            if os.path.exists(image_path):
+                return image_path
+                
+            # Try to get image from article
             if news_url:
                 article_image = cls.get_article_image(news_url)
                 if article_image:
-                    return cls.get_cached_image(article_image, save_path)
+                    cached_image = cls.get_cached_image(article_image, image_path)
+                    if cached_image:
+                        return cached_image
 
-            # Fallback to Unsplash with specific search
+            # Fallback to Unsplash with cached results
             keywords = [word.lower() for word in title.split() 
                        if len(word) > 3 and word.lower() not in 
                        {'the', 'and', 'for', 'that', 'with', 'this', 'from'}][:3]
@@ -119,10 +146,11 @@ class ImageService:
             if not keywords:
                 keywords = ['news']
 
+            search_query = f"{' '.join(keywords)} news"
             params = {
-                "query": f"{' '.join(keywords)} news",
+                "query": search_query,
                 "orientation": "landscape",
-                "per_page": 5  # Get multiple options
+                "per_page": 5
             }
             
             headers = {"Authorization": f"Client-ID {UNSPLASH_ACCESS_KEY}"}
@@ -136,16 +164,18 @@ class ImageService:
             if response.status_code == 200:
                 data = response.json()
                 if data['results']:
-                    # Find first unused image
+                    # Try each result until we get a valid image
                     for result in data['results']:
                         image_url = result['urls']['regular']
                         if image_url not in cls.used_images:
-                            cls.used_images.add(image_url)
-                            return cls.get_cached_image(image_url, save_path)
+                            cached_image = cls.get_cached_image(image_url, image_path)
+                            if cached_image:
+                                cls.used_images.add(image_url)
+                                return cached_image
 
             return None
         except Exception as e:
-            print(f"Error generating image: {e}")
+            print(f"Error generating image for {title}: {e}")
             return None
 
     @staticmethod
