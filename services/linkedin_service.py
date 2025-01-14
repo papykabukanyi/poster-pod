@@ -19,85 +19,52 @@ class LinkedInService:
     
     def __init__(self):
         self.access_token = None
-        # Initialize Gemini with error handling
+        self._get_access_token()  # Get token on initialization
+        
         try:
             genai.configure(api_key=GEMINI_API_KEY)
             self.model = genai.GenerativeModel('gemini-pro')
             logging.info("Gemini AI initialized successfully")
         except AttributeError:
-            logging.warning("Using fallback caption generation - Gemini AI initialization failed")
+            logging.warning("Using fallback caption generation")
             self.model = None
         logging.info("LinkedIn service initialized")
 
     def _get_access_token(self):
-        """Get LinkedIn access token using client credentials"""
+        """Get LinkedIn access token using OAuth 2.0"""
         try:
-            url = "https://www.linkedin.com/oauth/v2/accessToken"
-            # Strip any quotes from secret
-            client_secret = LINKEDIN_CLIENT_SECRET.strip('"\'')
-            
+            auth_url = "https://www.linkedin.com/oauth/v2/accessToken"
             data = {
                 "grant_type": "client_credentials",
                 "client_id": LINKEDIN_CLIENT_ID,
-                "client_secret": client_secret
+                "client_secret": LINKEDIN_CLIENT_SECRET.strip("'\""),
+                "scope": "w_member_social w_organization_social rw_organization_admin"
             }
-            
             headers = {
-                'Content-Type': 'application/x-www-form-urlencoded'
+                "Content-Type": "application/x-www-form-urlencoded"
             }
             
-            logging.info(f"Requesting access token with client ID: {LINKEDIN_CLIENT_ID[:8]}...")
-            response = requests.post(url, data=data, headers=headers)
-            
-            logging.info(f"Token response status: {response.status_code}")
-            response_data = response.json()
-            logging.info(f"Token response: {json.dumps(response_data, indent=2)}")
+            logging.info("Requesting new access token")
+            response = requests.post(auth_url, data=data, headers=headers)
             
             if response.status_code == 200:
-                self.access_token = response_data.get("access_token")
-                if self.access_token:
-                    logging.info("Successfully obtained access token")
-                    return True
-                    
-            logging.error(f"Failed to get token. Response: {response.text}")
+                token_data = response.json()
+                self.access_token = token_data.get('access_token')
+                logging.info("Successfully obtained new access token")
+                return True
+            
+            logging.error(f"Token request failed: {response.text}")
             return False
             
         except Exception as e:
             logging.error(f"Token error: {str(e)}")
             return False
 
-    def _generate_caption(self, article):
-        """Generate caption with fallback"""
-        try:
-            if not self.model:
-                # Fallback caption if Gemini fails
-                return f"""Breaking News Update:
-
-{article.title}
-
-Read more at www.onposter.site/news
-
-#BreakingNews #News #CurrentEvents"""
-
-            prompt = f"""Create a LinkedIn post for this news article:
-            Title: {article.title}
-            Description: {article.description}
-            Format: Summary + Company Tags + Hashtags"""
-            
-            response = self.model.generate_content(prompt)
-            return response.text if response else None
-        except Exception as e:
-            logging.error(f"Caption generation error: {str(e)}")
-            # Return fallback caption
-            return f"{article.title}\n\nRead more at www.onposter.site/news\n\n#BreakingNews"
-
     def post_article(self, article):
         """Post article to LinkedIn"""
         try:
-            logging.info(f"Attempting to post article: {article.title}")
-            
             if not self.access_token and not self._get_access_token():
-                logging.error("Failed to obtain access token")
+                logging.error("No valid access token")
                 return False
 
             caption = self._generate_caption(article)
@@ -105,51 +72,11 @@ Read more at www.onposter.site/news
                 logging.error("Failed to generate caption")
                 return False
 
+            # Use full URL for image
             image_url = urljoin("https://www.onposter.site", article.image_url)
             logging.info(f"Using image URL: {image_url}")
 
-            # Register image with LinkedIn first
-            register_image_url = f"{self.BASE_URL}/assets?action=registerUpload"
-            
-            headers = {
-                "Authorization": f"Bearer {self.access_token}",
-                "Content-Type": "application/json"
-            }
-            
-            register_data = {
-                "registerUploadRequest": {
-                    "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
-                    "owner": f"urn:li:organization:{LINKEDIN_ORG_ID}",
-                    "serviceRelationships": [{
-                        "relationshipType": "OWNER",
-                        "identifier": "urn:li:userGeneratedContent"
-                    }]
-                }
-            }
-            
-            logging.info("Registering image with LinkedIn")
-            register_response = requests.post(register_image_url, headers=headers, json=register_data)
-            
-            if register_response.status_code != 200:
-                logging.error(f"Image registration failed: {register_response.text}")
-                return False
-                
-            upload_url = register_response.json()["value"]["uploadMechanism"]["com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest"]["uploadUrl"]
-            asset_id = register_response.json()["value"]["asset"]
-            logging.info(f"Image registered successfully. Asset ID: {asset_id}")
-
-            # Upload image to LinkedIn
-            logging.info("Uploading image to LinkedIn")
-            image_response = requests.get(image_url)
-            upload_response = requests.post(upload_url, data=image_response.content, headers={
-                "Authorization": f"Bearer {self.access_token}"
-            })
-
-            if upload_response.status_code != 201:
-                logging.error(f"Image upload failed: {upload_response.text}")
-                return False
-
-            # Create post with uploaded image
+            # LinkedIn v2 API post format
             post_data = {
                 "author": f"urn:li:organization:{LINKEDIN_ORG_ID}",
                 "lifecycleState": "PUBLISHED",
@@ -158,17 +85,18 @@ Read more at www.onposter.site/news
                         "shareCommentary": {
                             "text": caption
                         },
-                        "shareMediaCategory": "IMAGE",
+                        "shareMediaCategory": "ARTICLE",
                         "media": [
                             {
                                 "status": "READY",
                                 "description": {
-                                    "text": article.title
+                                    "text": article.description[:100] + "..."
                                 },
-                                "media": asset_id,
+                                "originalUrl": "https://www.onposter.site/news",
                                 "title": {
                                     "text": article.title
-                                }
+                                },
+                                "thumbnailUrl": image_url
                             }
                         ]
                     }
@@ -178,22 +106,72 @@ Read more at www.onposter.site/news
                 }
             }
 
+            headers = {
+                "Authorization": f"Bearer {self.access_token}",
+                "X-Restli-Protocol-Version": "2.0.0",
+                "LinkedIn-Version": "202304",
+                "Content-Type": "application/json"
+            }
+
             logging.info("Creating LinkedIn post")
-            logging.debug(f"Post data: {json.dumps(post_data, indent=2)}")
-            
             response = requests.post(
                 f"{self.BASE_URL}/ugcPosts",
                 headers=headers,
                 json=post_data
             )
 
-            if response.status_code == 201:
+            logging.info(f"Response Status: {response.status_code}")
+            logging.info(f"Response Body: {response.text}")
+
+            if response.status_code in [201, 200]:
                 logging.info("Successfully posted to LinkedIn!")
                 return True
                 
-            logging.error(f"Post creation failed: {response.text}")
+            if response.status_code == 401:
+                logging.info("Token expired, requesting new token")
+                if self._get_access_token():
+                    # Retry once with new token
+                    return self.post_article(article)
+                    
+            logging.error(f"Post failed: {response.text}")
             return False
             
         except Exception as e:
-            logging.error(f"Post creation error: {str(e)}")
+            logging.error(f"Post error: {str(e)}")
             return False
+
+    def _generate_caption(self, article):
+        """Generate caption with fallback"""
+        try:
+            if not self.model:
+                return self._get_fallback_caption(article)
+
+            prompt = f"""
+            Create an engaging LinkedIn post about this news:
+            Title: {article.title}
+            Description: {article.description}
+            
+            Format:
+            1. 2-3 engaging sentences
+            2. Add 3 relevant #hashtags
+            3. End with: Read more at www.onposter.site/news
+            """
+            
+            response = self.model.generate_content(prompt)
+            if response and response.text:
+                return response.text
+            return self._get_fallback_caption(article)
+            
+        except Exception as e:
+            logging.error(f"Caption error: {str(e)}")
+            return self._get_fallback_caption(article)
+
+    def _get_fallback_caption(self, article):
+        """Generate a simple fallback caption"""
+        return f"""Breaking News Update:
+
+{article.title}
+
+Read more at www.onposter.site/news
+
+#BreakingNews #GlobalNews #CurrentEvents"""

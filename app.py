@@ -290,7 +290,6 @@ def health_check():
 @app.route('/news')
 def news_page():
     try:
-        # Force fetch if no news exists
         if not NewsArticle.query.first():
             NewsService.fetch_news(force_breaking=True)
         
@@ -302,18 +301,36 @@ def news_page():
                                     .limit(3)\
                                     .all()
         
-        # Preload images with better error handling
-        try:
-            all_articles = [breaking_news] + other_news if breaking_news else other_news
-            preloaded_images = ImageService.preload_images(all_articles)
-        except Exception as img_error:
-            print(f"Image preload error: {img_error}")
-            preloaded_images = []
+        # Make sure we have all 4 articles
+        if breaking_news and len(other_news) < 3:
+            more_news = NewsService.fetch_news(force_breaking=True)
+            other_news = NewsArticle.query.filter_by(is_breaking=False)\
+                                        .order_by(NewsArticle.published_at.desc())\
+                                        .limit(3)\
+                                        .all()
         
-        return render_template('news.html', 
-                             breaking_news=breaking_news, 
+        # Force preload all images
+        all_articles = [breaking_news] if breaking_news else []
+        all_articles.extend(other_news)
+        preloaded_images = ImageService.preload_images(all_articles)
+        
+        if len(preloaded_images) < len(all_articles):
+            # Retry image generation for missing images
+            for article in all_articles:
+                if article.image_url not in preloaded_images:
+                    new_image = ImageService.generate_news_image(
+                        article.title,
+                        article.url,
+                        article.image_url.lstrip('/')
+                    )
+                    if new_image:
+                        preloaded_images.append(f"/{new_image}")
+        
+        return render_template('news.html',
+                             breaking_news=breaking_news,
                              other_news=other_news,
-                             preloaded_images=preloaded_images)
+                             preloaded_images=preloaded_images,
+                             total_articles=len(all_articles))
     except Exception as e:
         print(f"Error in news_page: {e}")
         return "Error loading news", 500

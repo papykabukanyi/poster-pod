@@ -86,7 +86,7 @@
         <div class="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-violet-500 mb-4"></div>
         <p class="text-white text-lg" id="loading-text">Loading news...</p>
         <div class="mt-4 text-violet-400 text-sm" id="loading-progress">
-            <span id="loaded-count">0</span>/<span id="total-count">0</span> images loaded
+            <span id="loaded-count">0</span>/<span id="total-count">{{ total_articles }}</span> articles loaded
         </div>
     </div>
 </div>
@@ -195,41 +195,41 @@ document.addEventListener('DOMContentLoaded', () => {
     const newsContent = document.querySelector('.container');
     const loadedCount = document.getElementById('loaded-count');
     const totalCount = document.getElementById('total-count');
+    const totalArticles = {{ total_articles }};
     
     // Hide content initially
     if (newsContent) {
         newsContent.style.opacity = '0';
     }
     
-    // Preload images
-    const imagesToLoad = document.querySelectorAll('[data-preload]');
+    // Preload all images
+    const imagesToLoad = document.querySelectorAll('[data-preload], .news-image');
     let loadedImages = 0;
-    totalCount.textContent = imagesToLoad.length;
     
     function updateProgress() {
         loadedImages++;
         loadedCount.textContent = loadedImages;
         
-        if (loadedImages >= imagesToLoad.length) {
+        if (loadedImages >= totalArticles) {
             finishLoading();
         }
     }
     
     function finishLoading() {
-        // Fade out loading screen
-        loadingScreen.style.opacity = '0';
-        setTimeout(() => {
-            loadingScreen.style.display = 'none';
-            // Show content
-            if (newsContent) {
-                newsContent.style.opacity = '1';
-                newsContent.style.transition = 'opacity 0.5s ease-in-out';
-            }
-        }, 500);
-        
-        // Initialize other features
-        initializeSnackbarTimer();
-        initializeCountdown();
+        // Only finish when all articles are loaded
+        if (loadedImages >= totalArticles) {
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+                if (newsContent) {
+                    newsContent.style.opacity = '1';
+                    newsContent.style.transition = 'opacity 0.5s ease-in-out';
+                }
+            }, 500);
+            
+            initializeSnackbarTimer();
+            initializeCountdown();
+        }
     }
     
     // Start loading images
@@ -239,12 +239,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateProgress();
             } else {
                 img.addEventListener('load', updateProgress);
-                img.addEventListener('error', updateProgress); // Count errors to prevent hanging
+                img.addEventListener('error', () => {
+                    console.error('Image failed to load:', img.src);
+                    updateProgress(); // Count errors to prevent hanging
+                });
             }
         });
         
-        // Fallback in case images take too long
-        setTimeout(finishLoading, 5000);
+        // Fallback timeout increased to ensure all images load
+        setTimeout(() => {
+            if (loadedImages < totalArticles) {
+                console.warn('Timeout: Some images failed to load');
+                finishLoading();
+            }
+        }, 10000); // 10 second timeout
     } else {
         finishLoading();
     }
