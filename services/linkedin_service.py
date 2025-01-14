@@ -19,9 +19,14 @@ class LinkedInService:
     
     def __init__(self):
         self.access_token = None
-        # Initialize Gemini
-        genai.configure(api_key=GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-pro')
+        # Initialize Gemini with error handling
+        try:
+            genai.configure(api_key=GEMINI_API_KEY)
+            self.model = genai.GenerativeModel('gemini-pro')
+            logging.info("Gemini AI initialized successfully")
+        except AttributeError:
+            logging.warning("Using fallback caption generation - Gemini AI initialization failed")
+            self.model = None
         logging.info("LinkedIn service initialized")
 
     def _get_access_token(self):
@@ -56,46 +61,29 @@ class LinkedInService:
             return False
 
     def _generate_caption(self, article):
-        """Generate caption using Gemini AI"""
+        """Generate caption with fallback"""
         try:
-            prompt = f"""
-            Create an engaging LinkedIn post for this news article.
-            
-            Article:
+            if not self.model:
+                # Fallback caption if Gemini fails
+                return f"""Breaking News Update:
+
+{article.title}
+
+Read more at www.onposter.site/news
+
+#BreakingNews #News #CurrentEvents"""
+
+            prompt = f"""Create a LinkedIn post for this news article:
             Title: {article.title}
             Description: {article.description}
+            Format: Summary + Company Tags + Hashtags"""
             
-            Requirements:
-            1. Write a compelling 2-3 sentence summary
-            2. Identify and tag relevant companies mentioned (format: @CompanyName)
-            3. Add 4-5 trending hashtags relevant to the news
-            4. End with: "Read more at www.onposter.site/news"
-            
-            Format the response as:
-            [Summary]
-            
-            [Company Tags]
-            
-            [Hashtags]
-            
-            Read more at www.onposter.site/news
-            """
-            
-            logging.info("Generating AI caption with Gemini")
             response = self.model.generate_content(prompt)
-            
-            if response:
-                caption = response.text
-                logging.info("Generated caption successfully")
-                logging.info(f"Caption preview: {caption[:100]}...")
-                return caption
-                
-            logging.error("Failed to generate caption")
-            return None
-            
+            return response.text if response else None
         except Exception as e:
             logging.error(f"Caption generation error: {str(e)}")
-            return None
+            # Return fallback caption
+            return f"{article.title}\n\nRead more at www.onposter.site/news\n\n#BreakingNews"
 
     def post_article(self, article):
         """Post article to LinkedIn"""
