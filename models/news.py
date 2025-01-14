@@ -8,8 +8,8 @@ class NewsArticle(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String(500), nullable=False)
     description = Column(Text)
-    url = Column(String(500))
-    image_url = Column(String(500))
+    url = Column(Text)  # Changed from String(500) to Text
+    image_url = Column(Text)  # Changed from String(500) to Text
     published_at = Column(DateTime)
     source = Column(String(100))
     category = Column(String(50))  # 'breaking', 'tech', 'tech_politics'

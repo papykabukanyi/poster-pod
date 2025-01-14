@@ -318,16 +318,16 @@ def get_news_update_time():
     try:
         current_time = datetime.utcnow()
         
+        # Initialize if needed
         if not NewsService.last_update_time:
             NewsService.last_update_time = current_time
-            # Force initial fetch
+            NewsService.next_update_time = current_time + timedelta(seconds=NewsService.breaking_news_check_interval)
+            # Initial fetch
             NewsService.fetch_news(force_breaking=True)
-        
-        next_update = NewsService.last_update_time + timedelta(minutes=30)
         
         return jsonify({
             'last_update': NewsService.last_update_time.isoformat(),
-            'next_update': next_update.isoformat(),
+            'next_update': NewsService.next_update_time.isoformat(),
             'server_time': current_time.isoformat()
         })
     except Exception as e:
@@ -335,7 +335,7 @@ def get_news_update_time():
         current_time = datetime.utcnow()
         return jsonify({
             'last_update': current_time.isoformat(),
-            'next_update': (current_time + timedelta(minutes=30)).isoformat(),
+            'next_update': (current_time + timedelta(seconds=NewsService.breaking_news_check_interval)).isoformat(),
             'server_time': current_time.isoformat()
         })
 
@@ -348,20 +348,26 @@ def refresh_news():
         print(f"Error refreshing news: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-# Update init_db to include new column
+def run_migration():
+    """Run database migrations"""
+    try:
+        with engine.connect() as connection:
+            with open('migrations/alter_news_articles.sql') as f:
+                connection.execute(text(f.read()))
+                connection.commit()
+        print("Migration completed successfully")
+    except Exception as e:
+        print(f"Migration error: {e}")
+
+# Update init_db function
 def init_db():
     inspector = inspect(engine)
-    
-    # Check if news_articles table exists
-    if not inspector.has_table('news_articles'):
-        try:
-            # Create all tables
-            Base.metadata.create_all(bind=engine)
-            print("Created database tables successfully")
-        except Exception as e:
-            print(f"Error creating tables: {e}")
-            return False
-    return True
+    try:
+        run_migration()
+        return True
+    except Exception as e:
+        print(f"Error initializing database: {e}")
+        return False
 
 @app.errorhandler(413)
 def request_entity_too_large(error):

@@ -15,6 +15,11 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 UNSPLASH_ACCESS_KEY = os.getenv('UNSPLASH_ACCESS_KEY')
 # Replace NEWS_API_KEY with:
 NEWSDATA_API_KEY = os.getenv('NEWSDATA_API_KEY')
+# Add to existing config.py
+LINKEDIN_CLIENT_ID = os.getenv('LINKEDIN_CLIENT_ID')
+LINKEDIN_CLIENT_SECRET = os.getenv('LINKEDIN_CLIENT_SECRET')
+# Add to existing config.py
+LINKEDIN_ORG_ID = os.getenv('LINKEDIN_ORG_ID')
 
 # Database configuration
 SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')

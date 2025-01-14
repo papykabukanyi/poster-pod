@@ -9,17 +9,33 @@ from models.base import db_session
 from config import NEWSDATA_API_KEY
 from services.image_service import ImageService
 import hashlib
+from services.linkedin_service import LinkedInService
+import logging
 
 class NewsService:
     last_update_time = None
-    breaking_news_check_interval = 300  # 5 minutes
+    next_update_time = None
+    breaking_news_check_interval = 7200  # 2 hours in seconds
     last_fetch_time = None
     seen_articles = set()
+    linkedin_service = LinkedInService()
+    last_linkedin_post = None
+    linkedin_post_interval = 7200  # 2 hours in seconds
     
     @classmethod
     def fetch_news(cls, force_breaking=False):
         try:
             current_time = datetime.utcnow()
+            
+            # Only fetch if forcing or time has elapsed
+            if not force_breaking and cls.next_update_time and current_time < cls.next_update_time:
+                logging.info("Skipping fetch - not time yet")
+                return
+                
+            # Update timing
+            cls.last_update_time = current_time
+            cls.next_update_time = current_time + timedelta(seconds=cls.breaking_news_check_interval)
+            
             cls.last_fetch_time = current_time
             ImageService.clear_used_images()
             
@@ -120,7 +136,7 @@ class NewsService:
                     )
 
             pub_date = datetime.fromisoformat(article['pubDate'].replace('Z', '+00:00'))
-            return NewsArticle(
+            news_article = NewsArticle(
                 title=article['title'],
                 description=article['description'],
                 url=article['link'],
@@ -130,6 +146,20 @@ class NewsService:
                 category='breaking' if is_breaking else 'news',
                 is_breaking=is_breaking
             )
+
+            # Post breaking news to LinkedIn
+            if is_breaking and (
+                not cls.last_linkedin_post or 
+                datetime.utcnow() - cls.last_linkedin_post >= timedelta(seconds=cls.linkedin_post_interval)
+            ):
+                logging.info("Attempting to post breaking news to LinkedIn")
+                if cls.linkedin_service.post_article(news_article):
+                    cls.last_linkedin_post = datetime.utcnow()
+                    logging.info(f"Successfully posted to LinkedIn at {cls.last_linkedin_post}")
+                else:
+                    logging.error("Failed to post to LinkedIn")
+        
+            return news_article
 
         except Exception as e:
             print(f"Error processing article: {e}")
@@ -156,4 +186,8 @@ class NewsService:
     @classmethod
     def force_refresh(cls):
         """Force an immediate refresh of news"""
-        cls.fetch_news(force_breaking=True)
+        current_time = datetime.utcnow()
+        # Only reset next_update_time if successful
+        if cls.fetch_news(force_breaking=True):
+            cls.last_update_time = current_time
+            cls.next_update_time = current_time + timedelta(seconds=cls.breaking_news_check_interval)

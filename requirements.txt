@@ -11,3 +11,7 @@ requests==2.31.0
 beautifulsoup4==4.12.2
 lxml==4.9.3  # Better parser for BeautifulSoup
 Pillow==10.0.0
+google-generativeai==0.1.0
+linkedin-api==2.0.0a4
+oauthlib==3.2.2
+requests-oauthlib==1.3.1

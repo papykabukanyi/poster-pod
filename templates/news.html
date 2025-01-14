@@ -185,44 +185,40 @@ function initializeCountdown() {
     if (reloadTimeout) clearTimeout(reloadTimeout);
     
     fetch('/news/update-time')
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
             const nextUpdate = new Date(data.next_update);
             const serverTime = new Date(data.server_time);
             const clientOffset = new Date() - serverTime;
-            let lastReload = Date.now();
             
             function updateTimer() {
-                try {
-                    const now = new Date(Date.now() - clientOffset);
-                    const timeLeft = nextUpdate - now;
-                    
-                    if (timeLeft <= 0) {
-                        forceRefresh();
-                        return;
-                    }
-                    
-                    const minutes = Math.floor(timeLeft / 60000);
-                    const seconds = Math.floor((timeLeft % 60000) / 1000);
-                    
-                    document.getElementById('countdown-timer').textContent = 
-                        `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-                } catch (error) {
-                    console.error('Timer update error:', error);
+                const now = new Date(Date.now() - clientOffset);
+                const timeLeft = nextUpdate - now;
+                
+                if (timeLeft <= 0) {
+                    location.reload();
+                    return;
                 }
+                
+                const minutes = Math.floor(timeLeft / 60000);
+                const seconds = Math.floor((timeLeft % 60000) / 1000);
+                
+                document.getElementById('countdown-timer').textContent = 
+                    `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                
+                requestAnimationFrame(updateTimer);
             }
             
             updateTimer();
-            return setInterval(updateTimer, 1000);
         })
         .catch(error => {
             console.error('Countdown error:', error);
             startFallbackCountdown();
         });
 }
+
+// Update LinkedIn posting interval to match news interval
+let linkedInPostInterval = 7200; // 2 hours in seconds
 
 function startFallbackCountdown() {
     console.log('Starting fallback countdown');
