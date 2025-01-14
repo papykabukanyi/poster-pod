@@ -33,10 +33,13 @@ class LinkedInService:
         """Get LinkedIn access token using client credentials"""
         try:
             url = "https://www.linkedin.com/oauth/v2/accessToken"
+            # Strip any quotes from secret
+            client_secret = LINKEDIN_CLIENT_SECRET.strip('"\'')
+            
             data = {
                 "grant_type": "client_credentials",
                 "client_id": LINKEDIN_CLIENT_ID,
-                "client_secret": LINKEDIN_CLIENT_SECRET
+                "client_secret": client_secret
             }
             
             headers = {
@@ -47,12 +50,15 @@ class LinkedInService:
             response = requests.post(url, data=data, headers=headers)
             
             logging.info(f"Token response status: {response.status_code}")
+            response_data = response.json()
+            logging.info(f"Token response: {json.dumps(response_data, indent=2)}")
+            
             if response.status_code == 200:
-                token_data = response.json()
-                self.access_token = token_data["access_token"]
-                logging.info("Successfully obtained access token")
-                return True
-                
+                self.access_token = response_data.get("access_token")
+                if self.access_token:
+                    logging.info("Successfully obtained access token")
+                    return True
+                    
             logging.error(f"Failed to get token. Response: {response.text}")
             return False
             

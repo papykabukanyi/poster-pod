@@ -47,9 +47,57 @@
   }
 }
 </script>
+<!-- Add to existing styles in news.html -->
+<style>
+    .container {
+        opacity: 0;
+        transition: opacity 0.5s ease-in-out;
+    }
+    
+    #loading-screen {
+        opacity: 1;
+        transition: opacity 0.5s ease-in-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    .fade-in {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+    
+    /* Loading animation */
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .animate-spin {
+        animation: spin 1s linear infinite;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
+<!-- Loading Screen -->
+<div id="loading-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-90 transition-opacity duration-500">
+    <div class="text-center">
+        <div class="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-violet-500 mb-4"></div>
+        <p class="text-white text-lg" id="loading-text">Loading news...</p>
+        <div class="mt-4 text-violet-400 text-sm" id="loading-progress">
+            <span id="loaded-count">0</span>/<span id="total-count">0</span> images loaded
+        </div>
+    </div>
+</div>
+
+<!-- Image Preloader -->
+<div style="display: none" aria-hidden="true">
+    {% for image in preloaded_images %}
+    <img src="{{ image }}" alt="" data-preload>
+    {% endfor %}
+</div>
+
 <!-- Countdown Snackbar -->
 <div id="countdown-snackbar" class="fixed top-4 right-4 z-50 transform transition-all duration-300 translate-x-full opacity-0">
     <div class="flex flex-row pl-4 py-2 gap-2 items-center border rounded-lg shadow overflow-hidden bg-gray-50/80 backdrop-blur-sm border-violet-600/50">
@@ -143,12 +191,62 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    try {
+    const loadingScreen = document.getElementById('loading-screen');
+    const newsContent = document.querySelector('.container');
+    const loadedCount = document.getElementById('loaded-count');
+    const totalCount = document.getElementById('total-count');
+    
+    // Hide content initially
+    if (newsContent) {
+        newsContent.style.opacity = '0';
+    }
+    
+    // Preload images
+    const imagesToLoad = document.querySelectorAll('[data-preload]');
+    let loadedImages = 0;
+    totalCount.textContent = imagesToLoad.length;
+    
+    function updateProgress() {
+        loadedImages++;
+        loadedCount.textContent = loadedImages;
+        
+        if (loadedImages >= imagesToLoad.length) {
+            finishLoading();
+        }
+    }
+    
+    function finishLoading() {
+        // Fade out loading screen
+        loadingScreen.style.opacity = '0';
+        setTimeout(() => {
+            loadingScreen.style.display = 'none';
+            // Show content
+            if (newsContent) {
+                newsContent.style.opacity = '1';
+                newsContent.style.transition = 'opacity 0.5s ease-in-out';
+            }
+        }, 500);
+        
+        // Initialize other features
         initializeSnackbarTimer();
         initializeCountdown();
-    } catch (error) {
-        console.error('Initialization error:', error);
-        startFallbackCountdown();
+    }
+    
+    // Start loading images
+    if (imagesToLoad.length > 0) {
+        imagesToLoad.forEach(img => {
+            if (img.complete) {
+                updateProgress();
+            } else {
+                img.addEventListener('load', updateProgress);
+                img.addEventListener('error', updateProgress); // Count errors to prevent hanging
+            }
+        });
+        
+        // Fallback in case images take too long
+        setTimeout(finishLoading, 5000);
+    } else {
+        finishLoading();
     }
 });
 

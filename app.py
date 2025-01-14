@@ -24,6 +24,7 @@ from werkzeug.utils import secure_filename
 from models.base import Base, db_session, engine
 from models.news import NewsArticle
 from services.news_service import NewsService
+from services.image_service import ImageService  # Add this line
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -301,9 +302,18 @@ def news_page():
                                     .limit(3)\
                                     .all()
         
+        # Preload images with better error handling
+        try:
+            all_articles = [breaking_news] + other_news if breaking_news else other_news
+            preloaded_images = ImageService.preload_images(all_articles)
+        except Exception as img_error:
+            print(f"Image preload error: {img_error}")
+            preloaded_images = []
+        
         return render_template('news.html', 
                              breaking_news=breaking_news, 
-                             other_news=other_news)
+                             other_news=other_news,
+                             preloaded_images=preloaded_images)
     except Exception as e:
         print(f"Error in news_page: {e}")
         return "Error loading news", 500

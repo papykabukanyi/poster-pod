@@ -182,3 +182,28 @@ class ImageService:
     def clear_used_images():
         """Clear the used images cache"""
         ImageService.used_images.clear()
+
+    @staticmethod
+    def preload_images(articles):
+        """Preload all article images"""
+        try:
+            preloaded = []
+            for article in articles:
+                if article.image_url:
+                    img_path = article.image_url.lstrip('/')
+                    if os.path.exists(img_path):
+                        preloaded.append(article.image_url)
+                    else:
+                        # Try to generate/cache image
+                        final_path = ImageService.generate_news_image(
+                            article.title,
+                            article.url,
+                            img_path
+                        )
+                        if final_path:
+                            preloaded.append(f"/{final_path}")
+                            
+            return preloaded
+        except Exception as e:
+            logging.error(f"Error preloading images: {e}")
+            return []
