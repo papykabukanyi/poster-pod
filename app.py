@@ -306,23 +306,40 @@ def health_check():
 @app.route('/news')
 def news_page():
     try:
-        # Get news from shared cache
-        articles = NewsService.get_cached_news()
-        next_update = NewsService.get_next_update_time()
+        scheduler = SchedulerService()
+        current_time = datetime.utcnow()
+        next_update = scheduler.get_next_update()
         
-        # Preload images
-        all_articles = ([articles['breaking']] if articles['breaking'] else []) + articles['other']
+        articles = NewsService.get_cached_news()
+        
+        all_articles = []
+        if articles.get('breaking'):
+            all_articles.append(articles['breaking'])
+        all_articles.extend(articles.get('other', []))
+        
         preloaded_images = ImageService.preload_images(all_articles)
         
-        return render_template('news.html',
-                             breaking_news=articles['breaking'],
-                             other_news=articles['other'],
-                             preloaded_images=preloaded_images,
-                             total_articles=articles['total'],
-                             next_update=next_update.isoformat())
+        return render_template(
+            'news.html',
+            breaking_news=articles.get('breaking'),
+            other_news=articles.get('other', []),
+            preloaded_images=preloaded_images,
+            total_articles=len(all_articles),
+            next_update=next_update.isoformat(),
+            server_time=current_time.isoformat()
+        )
     except Exception as e:
         logging.error(f"Error in news_page: {e}")
-        return jsonify({'error': str(e)}), 500
+        current_time = datetime.utcnow()
+        return render_template(
+            'news.html',
+            breaking_news=None,
+            other_news=[],
+            preloaded_images=[],
+            total_articles=0,
+            next_update=(current_time + timedelta(seconds=7200)).isoformat(),
+            server_time=current_time.isoformat()
+        )
 
 @app.route('/static/images/default-news.jpg')
 def default_news_image():
@@ -452,6 +469,17 @@ def twitter_manager():
             hide_preloader=True
         )
 
+@app.route('/twitter-auth')
+def twitter_auth():
+    """Twitter OAuth flow initialization"""
+    try:
+        twitter_service = TwitterService()
+        auth_url = twitter_service.get_auth_url()
+        return redirect(auth_url)
+    except Exception as e:
+        logging.error(f"Twitter auth error: {e}")
+        return redirect(url_for('twitter_manager'))
+
 def run_migration():
     """Run database migrations"""
     try:
@@ -488,8 +516,7 @@ def shutdown_session(exception=None):
 def init_app(app):
     with app.app_context():
         init_db()
-        NewsService.start_scheduler()
-        scheduler = SchedulerService()
+        scheduler = SchedulerService.get_instance()
         scheduler.start()
 
 if __name__ == '__main__':

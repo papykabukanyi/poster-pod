@@ -39,25 +39,19 @@ class NewsService:
             cls._instance = cls()
         return cls._instance
 
-    def fetch_news(self, force_breaking=False):
+    @classmethod
+    def fetch_news(cls, force_breaking=False):
+        """Class method for fetching news"""
         try:
             current_time = datetime.utcnow()
             
             # Check cache validity
-            if not force_breaking and self._cache['last_fetch']:
-                time_since_cache = (current_time - self._cache['last_fetch']).total_seconds()
-                if time_since_cache < self.breaking_news_check_interval:
-                    logging.info("Using cached news articles")
+            if not force_breaking and cls._cache['last_fetch']:
+                time_since_cache = (current_time - cls._cache['last_fetch']).total_seconds()
+                if time_since_cache < 7200:  # 2 hours
+                    logging.info("Using cached news")
                     return True
 
-            # Update timing
-            self.last_update_time = current_time
-            self.next_update_time = current_time + timedelta(seconds=self.breaking_news_check_interval)
-            
-            # Clear image cache
-            ImageService.clear_used_images()
-            
-            # Fetch from API
             params = {
                 'apikey': NEWSDATA_API_KEY,
                 'country': 'us,gb',
@@ -77,7 +71,7 @@ class NewsService:
                         session.query(NewsArticle).delete()
                         
                         # Process breaking news
-                        breaking_news = self._process_article(articles[0], is_breaking=True)
+                        breaking_news = cls._process_article(articles[0], is_breaking=True)
                         if breaking_news:
                             session.add(breaking_news)
                         
@@ -88,7 +82,7 @@ class NewsService:
                         for article in articles[1:4]:  # Limit to 3 other articles
                             if article['title'] not in seen_titles:
                                 seen_titles.add(article['title'])
-                                news_article = self._process_article(article)
+                                news_article = cls._process_article(article)
                                 if news_article:
                                     other_news.append(news_article)
                         
@@ -96,14 +90,14 @@ class NewsService:
                         session.commit()
                         
                         # Update cache
-                        self._cache.update({
+                        cls._cache.update({
                             'breaking': breaking_news,
                             'other': other_news,
                             'last_fetch': current_time,
-                            'next_update': self.next_update_time
+                            'next_update': current_time + timedelta(seconds=7200)
                         })
                         
-                        logging.info(f"Updated news at {current_time} with {len(other_news) + 1} articles")
+                        logging.info(f"Updated news at {current_time}")
                         return True
             
             return False
@@ -210,7 +204,7 @@ class NewsService:
                 
                 articles = {
                     'breaking': breaking_news,
-                    'other': other_news,
+                    'other': other_news if other_news else [],
                     'total': len(other_news) + (1 if breaking_news else 0)
                 }
                 
@@ -223,7 +217,11 @@ class NewsService:
                 
         except Exception as e:
             logging.error(f"Error getting cached news: {e}")
-            return {'breaking': None, 'other': [], 'total': 0}
+            return {
+                'breaking': None,
+                'other': [],
+                'total': 0
+            }
 
     @classmethod
     def get_next_update_time(cls):
