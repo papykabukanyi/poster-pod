@@ -64,18 +64,22 @@ class TwitterService:
                 return False
 
             current_time = datetime.utcnow()
-            if (self.last_post_time and 
-                current_time - self.last_post_time < timedelta(seconds=self.post_interval)):
-                logging.info("Skipping Twitter post - too soon since last post")
-                return False
+            
+            # Strict 30-minute check
+            if self.last_post_time:
+                time_since_last = (current_time - self.last_post_time).total_seconds()
+                if time_since_last < 1800:  # 30 minutes in seconds
+                    logging.info(f"Skipping Twitter post - only {time_since_last} seconds since last post")
+                    return False
 
             caption = self._generate_caption(article)
             response = self.client.create_tweet(text=caption)
             
             if response.data:
                 self.last_post_time = current_time
-                logging.info(f"Successfully posted to Twitter: {response.data['id']}")
+                logging.info(f"Successfully posted to Twitter at {current_time}")
                 return True
+                
             return False
 
         except Exception as e:
