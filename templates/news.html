@@ -365,21 +365,20 @@ function initializeSnackbarTimer() {
 let reloadTimeout;
 
 function initializeCountdown() {
+    const serverTime = new Date({{ server_time|tojson }});
     const nextUpdate = new Date({{ next_update|tojson }});
-    let lastCheck = new Date();
-
+    
     function updateTimer() {
         const now = new Date();
-        const timeLeft = nextUpdate - now;
+        const timeDiff = nextUpdate - now;
 
-        if (timeLeft <= 0) {
+        if (timeDiff <= 0) {
             location.reload();
             return;
         }
 
-        // Format countdown
-        const minutes = Math.floor(timeLeft / 60000);
-        const seconds = Math.floor((timeLeft % 60000) / 1000);
+        const minutes = Math.floor(timeDiff / 60000);
+        const seconds = Math.floor((timeDiff % 60000) / 1000);
         
         const timerElement = document.getElementById('countdown-timer');
         if (timerElement) {
@@ -387,9 +386,7 @@ function initializeCountdown() {
                 `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
         }
 
-        // Determine next tick
-        const nextTick = 1000 - (now.getMilliseconds());
-        setTimeout(updateTimer, nextTick);
+        requestAnimationFrame(updateTimer);
     }
 
     updateTimer();

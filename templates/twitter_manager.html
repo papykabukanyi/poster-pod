@@ -65,6 +65,10 @@
                         Back to Admin
                     </a>
                 </div>
+                
+                <div class="mt-4 text-sm text-[#A4A5A6]">
+                    Next Twitter post in: <span id="twitter-countdown" class="font-bold">00:00</span>
+                </div>
             </div>
         </div>
     </div>
@@ -77,5 +81,31 @@ function disconnectTwitter() {
         window.location.reload();
     }
 }
+
+function initializeTwitterCountdown() {
+    const nextPost = new Date({{ next_twitter_post|tojson }});
+    
+    function updateCountdown() {
+        const now = new Date();
+        const timeLeft = nextPost - now;
+
+        if (timeLeft <= 0) {
+            location.reload();
+            return;
+        }
+
+        const minutes = Math.floor(timeLeft / 60000);
+        const seconds = Math.floor((timeLeft % 60000) / 1000);
+        
+        document.getElementById('twitter-countdown').textContent = 
+            `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+        requestAnimationFrame(updateCountdown);
+    }
+
+    updateCountdown();
+}
+
+document.addEventListener('DOMContentLoaded', initializeTwitterCountdown);
 </script>
 {% endblock %}

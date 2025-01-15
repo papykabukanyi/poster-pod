@@ -10,17 +10,24 @@ from services.twitter_service import TwitterService  # Add this import
 
 class SchedulerService:
     def __init__(self):
-        self.news_interval = 7200  # 2 hours in seconds
-        self.twitter_interval = 1800  # 30 minutes in seconds
-        self.cleanup_interval = 9200  # 2 hours in seconds
+        self.news_interval = 7200  # 2 hours
+        self.twitter_interval = 1800  # 30 minutes
+        self.cleanup_interval = 43200  # 12 hours
         self.running = False
         self.thread = None
-        self.twitter_service = TwitterService()  # Initialize Twitter service
-        self.last_news_update = None
-        self.last_twitter_update = None
-        self.last_cleanup = None
-        logging.basicConfig(level=logging.INFO)
+        self.twitter_service = TwitterService()
+        self.last_news_update = datetime.utcnow()
+        self.last_twitter_update = datetime.utcnow()
+        self.last_cleanup = datetime.utcnow()
         self.logger = logging.getLogger(__name__)
+
+    @property
+    def next_news_update(self):
+        return self.last_news_update + timedelta(seconds=self.news_interval)
+
+    @property
+    def next_twitter_update(self):
+        return self.last_twitter_update + timedelta(seconds=self.twitter_interval)
 
     def cleanup_images(self):
         """Delete cached images older than 2 hours"""
@@ -47,33 +54,31 @@ class SchedulerService:
             try:
                 current_time = datetime.utcnow()
 
-                # News update check (every 2 hours)
-                if not self.last_news_update or (current_time - self.last_news_update).total_seconds() >= self.news_interval:
+                # News update (every 2 hours)
+                if current_time >= self.next_news_update:
                     self.logger.info("Running scheduled news update")
-                    news_service = NewsService()
-                    if news_service.fetch_news(force_breaking=True):
+                    if NewsService.fetch_news(force_breaking=True):
                         self.last_news_update = current_time
-                        news_service.next_update_time = current_time + timedelta(seconds=self.news_interval)
+                        self.logger.info(f"News updated at {current_time}")
 
-                # Twitter post check (every 30 minutes)
-                if not self.last_twitter_update or (current_time - self.last_twitter_update).total_seconds() >= self.twitter_interval:
+                # Twitter post (every 30 minutes)
+                if current_time >= self.next_twitter_update:
                     cached_news = NewsService.get_cached_news()
                     if cached_news and cached_news.get('breaking'):
-                        self.logger.info("Running scheduled Twitter post")
                         if self.twitter_service.post_article(cached_news['breaking']):
                             self.last_twitter_update = current_time
+                            self.logger.info(f"Twitter post at {current_time}")
 
-                # Cleanup check (every 2 hours)
-                if not self.last_cleanup or (current_time - self.last_cleanup).total_seconds() >= self.cleanup_interval:
-                    self.logger.info("Running scheduled image cleanup")
+                # Cleanup (every 12 hours)
+                if (current_time - self.last_cleanup).total_seconds() >= self.cleanup_interval:
                     self.cleanup_images()
                     self.last_cleanup = current_time
 
-                time.sleep(30)  # Check every 30 seconds
+                time.sleep(30)
 
             except Exception as e:
                 self.logger.error(f"Scheduler error: {e}")
-                time.sleep(300)  # Wait 5 minutes on error
+                time.sleep(60)
 
     def start(self):
         """Start the scheduler"""

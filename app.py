@@ -432,15 +432,15 @@ def linkedin_manager():
 
 @app.route('/twitter-manager')
 def twitter_manager():
-    """Handle Twitter connection management"""
     try:
-        # Initialize Twitter service
+        scheduler = SchedulerService()
         twitter_service = TwitterService()
-        # Check connection status
         is_connected = twitter_service.check_connection()
+        
         return render_template(
             'twitter_manager.html',
             is_connected=is_connected,
+            next_twitter_post=scheduler.next_twitter_update.isoformat(),
             hide_preloader=True
         )
     except Exception as e:
@@ -448,8 +448,8 @@ def twitter_manager():
         return render_template(
             'twitter_manager.html',
             is_connected=False,
-            hide_preloader=True,
-            error=str(e)
+            error=str(e),
+            hide_preloader=True
         )
 
 def run_migration():
