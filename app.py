@@ -416,15 +416,13 @@ def linkedin_callback():
         logging.error(f"Callback error: {str(e)}")
         return redirect(url_for('news_page'))
 
-@app.before_request
-def check_linkedin_auth():
-    """Auto-initiate LinkedIn auth if needed"""
-    if request.endpoint in ['news_page', 'news_update']:
-        token = LinkedInTokenService.get_stored_token()
-        if not token and 'linkedin_auth_started' not in session:
-            session['linkedin_auth_started'] = True
-            session['original_url'] = request.url
-            return redirect(url_for('linkedin_auth'))
+@app.route('/linkedin-manager')
+def linkedin_manager():
+    # Get token and remove loading screen immediately
+    token = LinkedInTokenService.get_stored_token()
+    return render_template('linkedin_manager.html', 
+                         is_connected=bool(token),
+                         hide_preloader=True)  # Add this flag
 
 def run_migration():
     """Run database migrations"""

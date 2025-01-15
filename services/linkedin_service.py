@@ -103,7 +103,7 @@ class LinkedInService:
             return False
 
     def post_article(self, article):
-        """Post article using LinkedIn v2 API"""
+        """Post article using LinkedIn v2 API with organization posting"""
         try:
             if not self.access_token:
                 logging.error("No access token available")
@@ -116,39 +116,49 @@ class LinkedInService:
                 "Content-Type": "application/json"
             }
 
+            # Generate engaging caption
             caption = self._generate_caption(article)
             
+            # Create URN for organization
+            org_urn = f"urn:li:organization:{LINKEDIN_ORG_ID}"
+            
+            # Prepare image URL with absolute path
+            image_url = f"https://www.onposter.site{article.image_url}"
+            
+            # Prepare post data
             post_data = {
-                "content": {
-                    "contentEntities": [{
-                        "entityLocation": "https://www.onposter.site/news",
-                        "thumbnails": [{
-                            "resolvedUrl": urljoin("https://www.onposter.site", article.image_url)
-                        }],
-                        "title": article.title
-                    }],
-                    "title": article.title
-                },
+                "author": org_urn,
+                "commentary": caption,
+                "visibility": "PUBLIC",
                 "distribution": {
-                    "linkedInDistributionTarget": {
-                        "visibleToGuest": True
+                    "feedDistribution": "MAIN_FEED",
+                    "targetEntities": [],
+                    "thirdPartyDistributionChannels": []
+                },
+                "content": {
+                    "article": {
+                        "source": "https://www.onposter.site/news",
+                        "title": article.title,
+                        "description": article.description[:100] + "...",
+                        "thumbnails": [{
+                            "url": image_url
+                        }]
                     }
                 },
-                "owner": f"urn:li:organization:{LINKEDIN_ORG_ID}",
-                "text": {
-                    "text": caption
+                "lifecycle": {
+                    "publishedAt": int(datetime.utcnow().timestamp() * 1000)
                 }
             }
 
-            logging.info("Creating LinkedIn post")
+            # Post to LinkedIn
             response = requests.post(
                 f"{self.BASE_URL}/posts",
-                headers=headers, 
+                headers=headers,
                 json=post_data
             )
 
+            # Handle token refresh if needed
             if response.status_code == 401 and self._refresh_token():
-                # Retry with new token
                 headers["Authorization"] = f"Bearer {self.access_token}"
                 response = requests.post(
                     f"{self.BASE_URL}/posts",
@@ -156,13 +166,14 @@ class LinkedInService:
                     json=post_data
                 )
 
-            logging.info(f"Response Status: {response.status_code}")
-            logging.info(f"Response Body: {response.text}")
+            # Log response for debugging
+            logging.info(f"LinkedIn API Response: {response.status_code}")
+            logging.info(f"Response body: {response.text}")
 
             return response.status_code in [201, 200]
 
         except Exception as e:
-            logging.error(f"Post error: {str(e)}")
+            logging.error(f"LinkedIn post error: {str(e)}")
             return False
 
     def _generate_caption(self, article):
