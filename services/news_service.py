@@ -21,11 +21,30 @@ class NewsService:
     linkedin_service = LinkedInService()
     last_linkedin_post = None
     linkedin_post_interval = 7200  # 2 hours in seconds
+    cached_articles = {
+        'breaking': None,
+        'other': [],
+        'last_fetch': None
+    }
+    
+    # Class-level cache for sharing across instances
+    _cache = {
+        'articles': None,
+        'last_fetch': None,
+        'next_update': None
+    }
     
     @classmethod
     def fetch_news(cls, force_breaking=False):
         try:
             current_time = datetime.utcnow()
+            
+            # Return cached news if valid
+            if not force_breaking and cls.cached_articles['last_fetch']:
+                time_since_cache = (current_time - cls.cached_articles['last_fetch']).total_seconds()
+                if time_since_cache < cls.breaking_news_check_interval:
+                    logging.info("Using cached news articles")
+                    return True
             
             # Only fetch if forcing or time has elapsed
             if not force_breaking and cls.next_update_time and current_time < cls.next_update_time:
@@ -95,6 +114,13 @@ class NewsService:
                     print("No articles found from API")
             else:
                 print(f"API request failed with status {response.status_code}")
+
+            # Update cache after successful fetch
+            if articles:
+                with db_session() as session:
+                    cls.cached_articles['breaking'] = breaking_news
+                    cls.cached_articles['other'] = other_articles
+                    cls.cached_articles['last_fetch'] = current_time
 
         except Exception as e:
             print(f"Error fetching news: {e}")
@@ -191,3 +217,38 @@ class NewsService:
         if cls.fetch_news(force_breaking=True):
             cls.last_update_time = current_time
             cls.next_update_time = current_time + timedelta(seconds=cls.breaking_news_check_interval)
+
+    @classmethod
+    def get_cached_news(cls):
+        """Get news from cache or database"""
+        current_time = datetime.utcnow()
+        
+        # Return cache if valid
+        if cls._cache['articles'] and cls._cache['next_update']:
+            if current_time < cls._cache['next_update']:
+                logging.info("Using cached news")
+                return cls._cache['articles']
+        
+        # Get from database
+        with db_session() as session:
+            breaking_news = session.query(NewsArticle).filter_by(is_breaking=True)\
+                                  .order_by(NewsArticle.published_at.desc())\
+                                  .first()
+            other_news = session.query(NewsArticle).filter_by(is_breaking=False)\
+                                .order_by(NewsArticle.published_at.desc())\
+                                .limit(3)\
+                                .all()
+            
+            articles = {
+                'breaking': breaking_news,
+                'other': other_news,
+                'total': len(other_news) + (1 if breaking_news else 0)
+            }
+            
+            # Update cache
+            cls._cache['articles'] = articles
+            cls._cache['last_fetch'] = current_time
+            if not cls._cache['next_update']:
+                cls._cache['next_update'] = current_time + timedelta(seconds=cls.breaking_news_check_interval)
+            
+            return articles

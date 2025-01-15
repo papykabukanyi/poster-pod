@@ -6,6 +6,7 @@ from config import GEMINI_API_KEY, LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET, L
 from urllib.parse import urljoin
 import logging
 import json
+from services.linkedin_token_service import LinkedInTokenService
 
 # Setup logging
 logging.basicConfig(
@@ -18,9 +19,7 @@ class LinkedInService:
     BASE_URL = "https://api.linkedin.com/v2"
     
     def __init__(self):
-        self.access_token = None
-        self._get_access_token()  # Get token on initialization
-        
+        self.access_token = LinkedInTokenService.get_stored_token()
         try:
             genai.configure(api_key=GEMINI_API_KEY)
             self.model = genai.GenerativeModel('gemini-pro')
@@ -30,124 +29,149 @@ class LinkedInService:
             self.model = None
         logging.info("LinkedIn service initialized")
 
-    def _get_access_token(self):
-        """Get LinkedIn access token using OAuth 2.0"""
+    def _refresh_token(self):
+        """Get new access token"""
         try:
-            auth_url = "https://www.linkedin.com/oauth/v2/accessToken"
+            token_url = "https://www.linkedin.com/oauth/v2/accessToken"
             data = {
-                "grant_type": "client_credentials",
-                "client_id": LINKEDIN_CLIENT_ID,
-                "client_secret": LINKEDIN_CLIENT_SECRET.strip("'\""),
-                "scope": "w_member_social w_organization_social rw_organization_admin"
+                'grant_type': 'refresh_token',
+                'client_id': LINKEDIN_CLIENT_ID,
+                'client_secret': LINKEDIN_CLIENT_SECRET,
+                'refresh_token': self.access_token
             }
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded"
-            }
+            headers = {'Content-Type': 'application/x-www-form-urlencoded'}
             
-            logging.info("Requesting new access token")
-            response = requests.post(auth_url, data=data, headers=headers)
-            
+            response = requests.post(token_url, data=data, headers=headers)
             if response.status_code == 200:
                 token_data = response.json()
-                self.access_token = token_data.get('access_token')
-                logging.info("Successfully obtained new access token")
+                LinkedInTokenService.store_token(token_data)
+                self.access_token = token_data['access_token']
+                return True
+            return False
+        except Exception as e:
+            logging.error(f"Token refresh error: {e}")
+            return False
+
+    def _get_member_id(self):
+        """Get LinkedIn member ID from /me endpoint"""
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.access_token}",
+                "X-Restli-Protocol-Version": "2.0.0",
+                "LinkedIn-Version": "202401"
+            }
+            
+            response = requests.get(f"{self.BASE_URL}/me", headers=headers)
+            if response.status_code == 200:
+                self.member_id = response.json().get('id')
+                logging.info(f"Got member ID: {self.member_id}")
                 return True
             
+            logging.error(f"Failed to get member ID: {response.text}")
+            return False
+            
+        except Exception as e:
+            logging.error(f"Member ID error: {e}")
+            return False
+
+    def _get_access_token(self):
+        """Get LinkedIn access token"""
+        try:
+            token_url = "https://www.linkedin.com/oauth/v2/accessToken"
+            data = {
+                'grant_type': 'client_credentials',
+                'client_id': LINKEDIN_CLIENT_ID,
+                'client_secret': LINKEDIN_CLIENT_SECRET.strip('"\''),
+                'scope': 'w_member_social w_organization_social rw_organization_admin'
+            }
+            headers = {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+            
+            response = requests.post(token_url, data=data, headers=headers)
+            if response.status_code == 200:
+                token_data = response.json()
+                self.access_token = token_data['access_token']
+                logging.info("Successfully obtained LinkedIn token")
+                return True
+                
             logging.error(f"Token request failed: {response.text}")
             return False
             
         except Exception as e:
-            logging.error(f"Token error: {str(e)}")
+            logging.error(f"Token error: {e}")
             return False
 
     def post_article(self, article):
-        """Post article to LinkedIn"""
+        """Post article using LinkedIn v2 API"""
         try:
-            if not self.access_token and not self._get_access_token():
-                logging.error("No valid access token")
+            if not self.access_token:
+                logging.error("No access token available")
                 return False
-
-            caption = self._generate_caption(article)
-            if not caption:
-                logging.error("Failed to generate caption")
-                return False
-
-            # Use full URL for image
-            image_url = urljoin("https://www.onposter.site", article.image_url)
-            logging.info(f"Using image URL: {image_url}")
-
-            # LinkedIn v2 API post format
-            post_data = {
-                "author": f"urn:li:organization:{LINKEDIN_ORG_ID}",
-                "lifecycleState": "PUBLISHED",
-                "specificContent": {
-                    "com.linkedin.ugc.ShareContent": {
-                        "shareCommentary": {
-                            "text": caption
-                        },
-                        "shareMediaCategory": "ARTICLE",
-                        "media": [
-                            {
-                                "status": "READY",
-                                "description": {
-                                    "text": article.description[:100] + "..."
-                                },
-                                "originalUrl": "https://www.onposter.site/news",
-                                "title": {
-                                    "text": article.title
-                                },
-                                "thumbnailUrl": image_url
-                            }
-                        ]
-                    }
-                },
-                "visibility": {
-                    "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
-                }
-            }
 
             headers = {
                 "Authorization": f"Bearer {self.access_token}",
                 "X-Restli-Protocol-Version": "2.0.0",
-                "LinkedIn-Version": "202304",
+                "LinkedIn-Version": "202401",
                 "Content-Type": "application/json"
+            }
+
+            caption = self._generate_caption(article)
+            
+            post_data = {
+                "content": {
+                    "contentEntities": [{
+                        "entityLocation": "https://www.onposter.site/news",
+                        "thumbnails": [{
+                            "resolvedUrl": urljoin("https://www.onposter.site", article.image_url)
+                        }],
+                        "title": article.title
+                    }],
+                    "title": article.title
+                },
+                "distribution": {
+                    "linkedInDistributionTarget": {
+                        "visibleToGuest": True
+                    }
+                },
+                "owner": f"urn:li:organization:{LINKEDIN_ORG_ID}",
+                "text": {
+                    "text": caption
+                }
             }
 
             logging.info("Creating LinkedIn post")
             response = requests.post(
-                f"{self.BASE_URL}/ugcPosts",
-                headers=headers,
+                f"{self.BASE_URL}/posts",
+                headers=headers, 
                 json=post_data
             )
+
+            if response.status_code == 401 and self._refresh_token():
+                # Retry with new token
+                headers["Authorization"] = f"Bearer {self.access_token}"
+                response = requests.post(
+                    f"{self.BASE_URL}/posts",
+                    headers=headers,
+                    json=post_data
+                )
 
             logging.info(f"Response Status: {response.status_code}")
             logging.info(f"Response Body: {response.text}")
 
-            if response.status_code in [201, 200]:
-                logging.info("Successfully posted to LinkedIn!")
-                return True
-                
-            if response.status_code == 401:
-                logging.info("Token expired, requesting new token")
-                if self._get_access_token():
-                    # Retry once with new token
-                    return self.post_article(article)
-                    
-            logging.error(f"Post failed: {response.text}")
-            return False
-            
+            return response.status_code in [201, 200]
+
         except Exception as e:
             logging.error(f"Post error: {str(e)}")
             return False
 
     def _generate_caption(self, article):
-        """Generate caption with fallback"""
         try:
             if not self.model:
                 return self._get_fallback_caption(article)
 
             prompt = f"""
-            Create an engaging LinkedIn post about this news:
+            Create an engaging LinkedIn post for this news:
             Title: {article.title}
             Description: {article.description}
             
@@ -158,20 +182,11 @@ class LinkedInService:
             """
             
             response = self.model.generate_content(prompt)
-            if response and response.text:
-                return response.text
-            return self._get_fallback_caption(article)
+            return response.text if response else self._get_fallback_caption(article)
             
         except Exception as e:
-            logging.error(f"Caption error: {str(e)}")
+            logging.error(f"Caption error: {e}")
             return self._get_fallback_caption(article)
 
     def _get_fallback_caption(self, article):
-        """Generate a simple fallback caption"""
-        return f"""Breaking News Update:
-
-{article.title}
-
-Read more at www.onposter.site/news
-
-#BreakingNews #GlobalNews #CurrentEvents"""
+        return f"""Breaking News Update:\n\n{article.title}\n\nRead more at www.onposter.site/news\n\n#BreakingNews #News #LatestUpdates"""

@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from urllib.parse import urlencode
 
 load_dotenv()
 
@@ -20,6 +21,9 @@ LINKEDIN_CLIENT_ID = os.getenv('LINKEDIN_CLIENT_ID')
 LINKEDIN_CLIENT_SECRET = os.getenv('LINKEDIN_CLIENT_SECRET')
 # Add to existing config.py
 LINKEDIN_ORG_ID = os.getenv('LINKEDIN_ORG_ID')
+# Add LinkedIn configs
+LINKEDIN_REDIRECT_URI = os.getenv('LINKEDIN_REDIRECT_URI')
+LINKEDIN_TOKEN_FILE = 'linkedin_token.json'  # Store token locally
 
 # Database configuration
 SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')

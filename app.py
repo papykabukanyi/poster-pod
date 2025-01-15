@@ -1,5 +1,5 @@
 # app.py
-from flask import Flask, render_template, request, jsonify, abort, session, make_response, send_from_directory
+from flask import Flask, render_template, request, jsonify, abort, session, make_response, send_from_directory, url_for, redirect, session
 import cloudinary
 import cloudinary.uploader
 import os
@@ -25,6 +25,18 @@ from models.base import Base, db_session, engine
 from models.news import NewsArticle
 from services.news_service import NewsService
 from services.image_service import ImageService  # Add this line
+import secrets
+from services.linkedin_token_service import LinkedInTokenService
+import requests
+import logging
+from urllib.parse import urlencode
+
+# Add after imports
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -290,47 +302,18 @@ def health_check():
 @app.route('/news')
 def news_page():
     try:
-        if not NewsArticle.query.first():
-            NewsService.fetch_news(force_breaking=True)
+        # Get news from shared cache
+        articles = NewsService.get_cached_news()
         
-        breaking_news = NewsArticle.query.filter_by(is_breaking=True)\
-                                      .order_by(NewsArticle.published_at.desc())\
-                                      .first()
-        other_news = NewsArticle.query.filter_by(is_breaking=False)\
-                                    .order_by(NewsArticle.published_at.desc())\
-                                    .limit(3)\
-                                    .all()
-        
-        # Make sure we have all 4 articles
-        if breaking_news and len(other_news) < 3:
-            more_news = NewsService.fetch_news(force_breaking=True)
-            other_news = NewsArticle.query.filter_by(is_breaking=False)\
-                                        .order_by(NewsArticle.published_at.desc())\
-                                        .limit(3)\
-                                        .all()
-        
-        # Force preload all images
-        all_articles = [breaking_news] if breaking_news else []
-        all_articles.extend(other_news)
+        # Preload images
+        all_articles = ([articles['breaking']] if articles['breaking'] else []) + articles['other']
         preloaded_images = ImageService.preload_images(all_articles)
         
-        if len(preloaded_images) < len(all_articles):
-            # Retry image generation for missing images
-            for article in all_articles:
-                if article.image_url not in preloaded_images:
-                    new_image = ImageService.generate_news_image(
-                        article.title,
-                        article.url,
-                        article.image_url.lstrip('/')
-                    )
-                    if new_image:
-                        preloaded_images.append(f"/{new_image}")
-        
         return render_template('news.html',
-                             breaking_news=breaking_news,
-                             other_news=other_news,
+                             breaking_news=articles['breaking'],
+                             other_news=articles['other'],
                              preloaded_images=preloaded_images,
-                             total_articles=len(all_articles))
+                             total_articles=articles['total'])
     except Exception as e:
         print(f"Error in news_page: {e}")
         return "Error loading news", 500
@@ -374,6 +357,74 @@ def refresh_news():
     except Exception as e:
         print(f"Error refreshing news: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/linkedin/auth')
+def linkedin_auth():
+    """Start LinkedIn OAuth flow"""
+    try:
+        state = secrets.token_urlsafe(16)
+        session['linkedin_state'] = state
+        
+        auth_params = {
+            'response_type': 'code',
+            'client_id': LINKEDIN_CLIENT_ID,
+            'redirect_uri': LINKEDIN_REDIRECT_URI,
+            'state': state,
+            # Only request posting scope
+            'scope': 'w_member_social'
+        }
+        
+        auth_url = f"https://www.linkedin.com/oauth/v2/authorization?{urlencode(auth_params)}"
+        logging.info(f"Starting LinkedIn auth flow: {auth_url}")
+        return redirect(auth_url)
+    except Exception as e:
+        logging.error(f"LinkedIn auth error: {str(e)}")
+        return "Authentication failed", 500
+
+@app.route('/linkedin/callback')
+def linkedin_callback():
+    """Handle LinkedIn OAuth callback"""
+    if 'error' in request.args:
+        error = request.args.get('error')
+        error_description = request.args.get('error_description')
+        logging.error(f"LinkedIn OAuth error: {error} - {error_description}")
+        return redirect(url_for('news_page'))  # Redirect back even on error
+        
+    try:
+        code = request.args.get('code')
+        if not code:
+            return redirect(url_for('news_page'))
+            
+        token_url = 'https://www.linkedin.com/oauth/v2/accessToken'
+        data = {
+            'grant_type': 'authorization_code',
+            'code': code,
+            'client_id': LINKEDIN_CLIENT_ID,
+            'client_secret': LINKEDIN_CLIENT_SECRET.strip('"\''),
+            'redirect_uri': LINKEDIN_REDIRECT_URI
+        }
+        
+        response = requests.post(token_url, data=data)
+        
+        if response.status_code == 200:
+            token_data = response.json()
+            LinkedInTokenService.store_token(token_data)
+            
+        return redirect(url_for('news_page'))
+        
+    except Exception as e:
+        logging.error(f"Callback error: {str(e)}")
+        return redirect(url_for('news_page'))
+
+@app.before_request
+def check_linkedin_auth():
+    """Auto-initiate LinkedIn auth if needed"""
+    if request.endpoint in ['news_page', 'news_update']:
+        token = LinkedInTokenService.get_stored_token()
+        if not token and 'linkedin_auth_started' not in session:
+            session['linkedin_auth_started'] = True
+            session['original_url'] = request.url
+            return redirect(url_for('linkedin_auth'))
 
 def run_migration():
     """Run database migrations"""

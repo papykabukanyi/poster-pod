@@ -76,6 +76,80 @@
     .animate-spin {
         animation: spin 1s linear infinite;
     }
+    
+    @media (max-width: 768px) {
+        /* Make content full height on mobile */
+        .h-screen {
+            min-height: 100vh;
+            height: auto !important;
+        }
+        
+        /* Adjust grid layout */
+        .grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        /* Make cards full height */
+        .news-card {
+            height: auto !important;
+            min-height: 400px;
+        }
+        
+        /* Show full description */
+        .line-clamp-2,
+        .line-clamp-3,
+        .line-clamp-4 {
+            -webkit-line-clamp: unset !important;
+            overflow: visible !important;
+        }
+        
+        /* Adjust image heights */
+        .h-40 {
+            height: 200px !important;
+        }
+        
+        /* Increase text sizes */
+        .text-[10px] {
+            font-size: 12px !important;
+        }
+        
+        .text-[11px] {
+            font-size: 14px !important;
+        }
+        
+        /* Add padding */
+        .p-3 {
+            padding: 1rem !important;
+        }
+        
+        /* Fix spacing */
+        .space-y-2 > * + * {
+            margin-top: 0.75rem !important;
+        }
+        
+        /* Make containers full width */
+        .container {
+            width: 100% !important;
+            max-width: none !important;
+            padding: 1rem !important;
+        }
+    }
+    
+    /* Fix grid heights */
+    .h-[200px] {
+        height: auto !important;
+        min-height: 200px;
+    }
+    
+    /* Show full content */
+    .mobile-content {
+        display: -webkit-box;
+        -webkit-line-clamp: unset;
+        -webkit-box-orient: vertical;
+        overflow: visible;
+    }
 </style>
 {% endblock %}
 
@@ -157,19 +231,19 @@
             <div class="h-1/2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {% for article in other_news %}
                 <a href="{{ article.url }}" target="_blank" 
-                   class="group hover:no-underline focus:no-underline bg-gray-50 rounded-lg overflow-hidden flex flex-col">
-                    <img class="object-cover w-full h-32" 
+                   class="news-card group hover:no-underline focus:no-underline bg-gray-50 rounded-lg overflow-hidden flex flex-col">
+                    <img class="object-cover w-full h-32 md:h-40" 
                          src="{{ article.image_url }}"
                          alt="{{ article.title }}">
-                    <div class="p-4 flex flex-col flex-1 h-[200px]"> <!-- Fixed height container -->
-                        <h3 class="text-sm font-semibold group-hover:underline line-clamp-2 mb-2">
+                    <div class="p-4 flex flex-col flex-1">
+                        <h3 class="text-sm md:text-base font-semibold group-hover:underline mb-2 mobile-content">
                             {{ article.title }}
                         </h3>
                         <div class="flex flex-col justify-between flex-1">
-                            <p class="text-xs text-gray-800 line-clamp-4"> <!-- Use line-clamp-4 -->
+                            <p class="text-xs md:text-sm text-gray-800 mobile-content">
                                 {{ article.description }}
                             </p>
-                            <div class="mt-2 flex items-center justify-between">
+                            <div class="mt-4 flex items-center justify-between">
                                 <span class="text-xs text-gray-600">
                                     {{ article.published_at.strftime('%B %d') }}
                                 </span>
