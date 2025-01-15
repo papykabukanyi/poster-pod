@@ -1,0 +1,81 @@
+<!-- templates/twitter_manager.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#A4A5A6] py-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="bg-black rounded-lg shadow-lg border border-gray-800 p-6">
+            <h1 class="text-2xl font-bold text-[#A4A5A6] mb-6">Twitter Connection Manager</h1>
+            
+            <div class="space-y-6">
+                <!-- Connection Status -->
+                <div class="p-4 rounded-lg {% if is_connected %}bg-green-900/20{% else %}bg-red-900/20{% endif %} border {% if is_connected %}border-green-600/30{% else %}border-red-600/30{% endif %}">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            {% if is_connected %}
+                            <svg class="h-6 w-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            {% else %}
+                            <svg class="h-6 w-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                            {% endif %}
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-lg font-medium {% if is_connected %}text-green-500{% else %}text-red-500{% endif %}">
+                                {% if is_connected %}
+                                Connected to Twitter
+                                {% else %}
+                                Not Connected
+                                {% endif %}
+                            </h3>
+                            <div class="mt-2 text-sm text-[#A4A5A6]">
+                                {% if is_connected %}
+                                Your account is connected and ready to post updates.
+                                {% else %}
+                                Connect your Twitter account to enable automatic posting.
+                                {% endif %}
+                            </div>
+                            {% if error %}
+                            <div class="mt-2 text-sm text-red-500">
+                                Error: {{ error }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex justify-start space-x-4">
+                    {% if not is_connected %}
+                    <a href="{{ url_for('twitter_auth') }}" 
+                       class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Connect Twitter Account
+                    </a>
+                    {% else %}
+                    <button onclick="disconnectTwitter()" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                        Disconnect Account
+                    </button>
+                    {% endif %}
+                    
+                    <a href="{{ url_for('admin') }}" 
+                       class="inline-flex items-center px-4 py-2 border border-gray-700 text-sm font-medium rounded-md text-[#A4A5A6] bg-transparent hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                        Back to Admin
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function disconnectTwitter() {
+    if (confirm('Are you sure you want to disconnect your Twitter account?')) {
+        // Add disconnect functionality
+        window.location.reload();
+    }
+}
+</script>
+{% endblock %}

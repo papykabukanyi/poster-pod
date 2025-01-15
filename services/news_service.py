@@ -11,6 +11,7 @@ from services.image_service import ImageService
 import hashlib
 from services.linkedin_service import LinkedInService
 import logging
+from services.twitter_service import TwitterService
 
 class NewsService:
     last_update_time = None
@@ -21,6 +22,8 @@ class NewsService:
     linkedin_service = LinkedInService()
     last_linkedin_post = None
     linkedin_post_interval = 7200  # 2 hours in seconds
+    twitter_service = TwitterService()  
+    last_twitter_post = None
     cached_articles = {
         'breaking': None,
         'other': [],
@@ -128,6 +131,9 @@ class NewsService:
     @classmethod
     def _fetch_news(cls, article, is_breaking=False):
         try:
+            # Add current_time definition at the start
+            current_time = datetime.utcnow()
+            
             # Create consistent hash for article
             article_hash = hashlib.md5(
                 f"{article['title']}{article['description']}".encode()
@@ -173,22 +179,24 @@ class NewsService:
                 is_breaking=is_breaking
             )
 
-            # Post breaking news to LinkedIn
-            if is_breaking and (
-                not cls.last_linkedin_post or 
-                datetime.utcnow() - cls.last_linkedin_post >= timedelta(seconds=cls.linkedin_post_interval)
-            ):
-                logging.info("Attempting to post breaking news to LinkedIn")
-                if cls.linkedin_service.post_article(news_article):
-                    cls.last_linkedin_post = datetime.utcnow()
-                    logging.info(f"Successfully posted to LinkedIn at {cls.last_linkedin_post}")
-                else:
-                    logging.error("Failed to post to LinkedIn")
-        
+            # Post to social media if breaking news
+            if is_breaking:
+                # LinkedIn posting (existing code)
+                if (not cls.last_linkedin_post or 
+                    current_time - cls.last_linkedin_post >= timedelta(seconds=cls.linkedin_post_interval)):
+                    if cls.linkedin_service.post_article(news_article):
+                        cls.last_linkedin_post = current_time
+
+                # Twitter posting
+                if (not cls.last_twitter_post or 
+                    current_time - cls.last_twitter_post >= timedelta(seconds=1800)):  # 30 minutes
+                    if cls.twitter_service.post_article(news_article):
+                        cls.last_twitter_post = current_time
+
             return news_article
 
         except Exception as e:
-            print(f"Error processing article: {e}")
+            logging.error(f"Error processing article: {e}")
             return None
 
     @classmethod

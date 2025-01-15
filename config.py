@@ -25,6 +25,15 @@ LINKEDIN_ORG_ID = os.getenv('LINKEDIN_ORG_ID')
 LINKEDIN_REDIRECT_URI = os.getenv('LINKEDIN_REDIRECT_URI')
 LINKEDIN_TOKEN_FILE = 'linkedin_token.json'  # Store token locally
 
+# Add to existing config.py
+TWITTER_API_KEY = os.getenv('TWITTER_API_KEY')
+TWITTER_API_SECRET = os.getenv('TWITTER_API_SECRET')
+TWITTER_ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
+TWITTER_ACCESS_SECRET = os.getenv('TWITTER_ACCESS_SECRET')
+TWITTER_CLIENT_ID = os.getenv('TWITTER_CLIENT_ID')
+TWITTER_CLIENT_SECRET = os.getenv('TWITTER_CLIENT_SECRET')
+TWITTER_TOKEN_FILE = 'twitter_token.json'
+
 # Database configuration
 SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
 

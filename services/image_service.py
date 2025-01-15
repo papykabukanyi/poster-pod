@@ -6,6 +6,14 @@ import hashlib
 from PIL import Image
 from io import BytesIO
 import time
+import logging
+
+# Optional: Add basic logging configuration if not configured elsewhere
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] ImageService: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 class ImageService:
     used_images = set()

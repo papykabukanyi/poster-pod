@@ -30,6 +30,9 @@ from services.linkedin_token_service import LinkedInTokenService
 import requests
 import logging
 from urllib.parse import urlencode
+from services.twitter_service import TwitterService
+import tweepy
+from datetime import datetime
 
 # Add after imports
 logging.basicConfig(
@@ -423,6 +426,28 @@ def linkedin_manager():
     return render_template('linkedin_manager.html', 
                          is_connected=bool(token),
                          hide_preloader=True)  # Add this flag
+
+@app.route('/twitter-manager')
+def twitter_manager():
+    """Handle Twitter connection management"""
+    try:
+        # Initialize Twitter service
+        twitter_service = TwitterService()
+        # Check connection status
+        is_connected = twitter_service.check_connection()
+        return render_template(
+            'twitter_manager.html',
+            is_connected=is_connected,
+            hide_preloader=True
+        )
+    except Exception as e:
+        logging.error(f"Twitter manager error: {e}")
+        return render_template(
+            'twitter_manager.html',
+            is_connected=False,
+            hide_preloader=True,
+            error=str(e)
+        )
 
 def run_migration():
     """Run database migrations"""
