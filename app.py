@@ -450,7 +450,8 @@ def linkedin_manager():
 @app.route('/twitter-manager')
 def twitter_manager():
     try:
-        scheduler = SchedulerService()
+        scheduler = SchedulerService.get_instance()
+        current_time = datetime.utcnow()
         twitter_service = TwitterService()
         is_connected = twitter_service.check_connection()
         
@@ -458,6 +459,7 @@ def twitter_manager():
             'twitter_manager.html',
             is_connected=is_connected,
             next_twitter_post=scheduler.next_twitter_update.isoformat(),
+            server_time=current_time.isoformat(),  # Add server time
             hide_preloader=True
         )
     except Exception as e:
@@ -466,6 +468,8 @@ def twitter_manager():
             'twitter_manager.html',
             is_connected=False,
             error=str(e),
+            next_twitter_post=(datetime.utcnow() + timedelta(seconds=1800)).isoformat(),
+            server_time=datetime.utcnow().isoformat(),
             hide_preloader=True
         )
 

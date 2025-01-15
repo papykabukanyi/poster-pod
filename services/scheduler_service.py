@@ -21,7 +21,7 @@ class SchedulerService:
 
     def __init__(self):
         self.news_interval = 7200  # 2 hours in seconds (unchanged)
-        self.twitter_interval = 1800  # 30 minutes (unchanged)
+        self.twitter_interval = 1800  # 30 minutes in seconds
         self.cleanup_interval = 43200  # 12 hours (unchanged)
         self.running = False
         self.thread = None
@@ -30,11 +30,11 @@ class SchedulerService:
         
         # Initialize timestamps as None to force initial updates
         self.last_news_update = None
-        self.last_twitter_update = None
+        self.last_twitter_update = datetime.utcnow()  # Initialize with current time
         self.last_cleanup = datetime.utcnow()
         
         self._next_news_update = None
-        self._next_twitter_update = None
+        self._next_twitter_update = self.last_twitter_update + timedelta(seconds=self.twitter_interval)
         
         self.logger = logging.getLogger(__name__)
 
@@ -59,8 +59,9 @@ class SchedulerService:
 
     @property
     def next_twitter_update(self):
-        if not self._next_twitter_update:
-            current_time = datetime.utcnow()
+        """Get next Twitter update time"""
+        current_time = datetime.utcnow()
+        if not self._next_twitter_update or current_time >= self._next_twitter_update:
             self._next_twitter_update = current_time + timedelta(seconds=self.twitter_interval)
         return self._next_twitter_update
 

@@ -53,12 +53,18 @@ function disconnectTwitter() {
 
 function initializeTwitterCountdown() {
     const nextPost = new Date("{{ next_twitter_post }}");
-    
+    const serverTime = new Date("{{ server_time }}");  // Add this to your template context
+    const localTime = new Date();
+    const timeDiff = localTime - serverTime;  // Time difference between local and server
+    let countdownInterval;
+
     function updateCountdown() {
         const now = new Date();
-        const timeLeft = nextPost - now;
+        const adjustedNow = new Date(now.getTime() - timeDiff);  // Adjust for server time
+        const timeLeft = nextPost - adjustedNow;
 
         if (timeLeft <= 0) {
+            clearInterval(countdownInterval);
             location.reload();
             return;
         }
@@ -66,15 +72,24 @@ function initializeTwitterCountdown() {
         const minutes = Math.floor(timeLeft / 60000);
         const seconds = Math.floor((timeLeft % 60000) / 1000);
         
-        document.getElementById('twitter-countdown').textContent = 
-            `${String(Math.min(minutes, 30)).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-
-        requestAnimationFrame(updateCountdown);
+        const timerElement = document.getElementById('twitter-countdown');
+        if (timerElement) {
+            timerElement.textContent = 
+                `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
     }
 
+    // Update immediately and then every second
     updateCountdown();
+    countdownInterval = setInterval(updateCountdown, 1000);
+
+    // Cleanup on page unload
+    window.addEventListener('unload', () => {
+        clearInterval(countdownInterval);
+    });
 }
 
+// Initialize once when document loads
 document.addEventListener('DOMContentLoaded', initializeTwitterCountdown);
 </script>
 {% endblock %}
