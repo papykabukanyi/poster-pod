@@ -1,43 +1,41 @@
+<p align="center">
+  <img src="static/images/logo.png" alt="Poster Podcast Logo" width="200"/>
+</p>
+
 # Poster Podcast 🎙️
 
 A modern, minimalist podcast hosting platform built with Flask and WaveSurfer.js. Share your audio content with a sleek, responsive player and real-time waveform visualization.
-
-![Poster Podcast Screenshot](static/images/og-image.jpg)
 
 ## Features ✨
 
 - **Beautiful Audio Player**
   - Real-time waveform visualization
   - Custom playback controls
-  - Volume adjustment
-  - Time tracking
+  - Audio processing with bass boost and effects
+  - Volume adjustment and time tracking
 
 - **Social Features**
-  - Like and share podcasts
+  - Like and share podcasts 
   - Embed players on other websites
   - View count tracking
+  - Social media share previews
   - Time-ago timestamps
-
-- **Technical Features**
-  - Cloudinary integration for audio storage
-  - PostgreSQL database
-  - Responsive design
-  - Mobile-friendly interface
 
 ## Tech Stack 🛠️
 
 - **Frontend:**
   - HTML5/CSS3
   - TailwindCSS
-  - WaveSurfer.js
+  - WaveSurfer.js with audio visualization
   - Vanilla JavaScript
 
 - **Backend:**
   - Flask (Python)
-  - SQLAlchemy
-  - PostgreSQL
-  - Cloudinary
+  - SQLAlchemy ORM
+  - PostgreSQL database
+  - Cloudinary media storage
+  - OAuth2 for social integrations
 
-## Quick Start 🚀
+## Contributing 🤝
 
-1. Clone the repository:
+Contributions are welcome! Please feel free to submit a Pull Request.
