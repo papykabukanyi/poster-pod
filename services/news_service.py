@@ -77,27 +77,32 @@ class NewsService:
                         
                         # Process other news
                         other_news = []
-                        seen_titles = {articles[0]['title']}
-                        
-                        for article in articles[1:4]:  # Limit to 3 other articles
+                        seen_titles = {articles[0]['title']}  # Start with breaking news title
+
+                        # Process up to 4 total articles (1 breaking + 3 others)
+                        for article in articles[1:]:  # Process all remaining articles
+                            if len(other_news) >= 3:  # Stop after getting 3 additional articles
+                                break
+                                
                             if article['title'] not in seen_titles:
                                 seen_titles.add(article['title'])
                                 news_article = cls._process_article(article)
                                 if news_article:
                                     other_news.append(news_article)
-                        
+
                         session.add_all(other_news)
                         session.commit()
-                        
-                        # Update cache
+
+                        # Update cache with correct counts
                         cls._cache.update({
                             'breaking': breaking_news,
                             'other': other_news,
                             'last_fetch': current_time,
-                            'next_update': current_time + timedelta(seconds=7200)
+                            'next_update': current_time + timedelta(seconds=7200),  # Exactly 2 hours
+                            'total': len(other_news) + (1 if breaking_news else 0)  # Add total count
                         })
-                        
-                        logging.info(f"Updated news at {current_time}")
+
+                        logging.info(f"Updated news at {current_time}, total articles: {len(other_news) + 1}")
                         return True
             
             return False

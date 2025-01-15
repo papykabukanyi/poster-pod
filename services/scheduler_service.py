@@ -20,9 +20,9 @@ class SchedulerService:
         return cls._instance
 
     def __init__(self):
-        self.news_interval = 7200  # 2 hours
-        self.twitter_interval = 1800  # 30 minutes
-        self.cleanup_interval = 43200  # 12 hours
+        self.news_interval = 7200  # 2 hours in seconds (unchanged)
+        self.twitter_interval = 1800  # 30 minutes (unchanged)
+        self.cleanup_interval = 43200  # 12 hours (unchanged)
         self.running = False
         self.thread = None
         self.twitter_service = TwitterService()
@@ -45,7 +45,7 @@ class SchedulerService:
             if NewsService.fetch_news(force_breaking=True):  # Using class method
                 self.last_news_update = datetime.utcnow()
                 self._next_news_update = self.last_news_update + timedelta(seconds=self.news_interval)
-                self.logger.info("Initial news fetch successful")
+                self.logger.info(f"Initial news fetch successful. Next update in {self.news_interval/3600} hours")
                 
                 # Initial Twitter post
                 cached_news = NewsService.get_cached_news()
