@@ -335,12 +335,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function showSnackbar() {
     const snackbar = document.getElementById('countdown-snackbar');
+    if (!snackbar.classList.contains('translate-x-full')) {
+        return; // Already visible
+    }
+    
     snackbar.classList.remove('translate-x-full', 'opacity-0');
     
-    // Hide after 2 seconds
     setTimeout(() => {
         hideSnackbar();
-    }, 2000);
+    }, 3000);
 }
 
 function hideSnackbar() {
@@ -362,40 +365,34 @@ function initializeSnackbarTimer() {
 let reloadTimeout;
 
 function initializeCountdown() {
-    // Clear any existing reload timeout
-    if (reloadTimeout) clearTimeout(reloadTimeout);
-    
-    fetch('/news/update-time')
-        .then(response => response.json())
-        .then(data => {
-            const nextUpdate = new Date(data.next_update);
-            const serverTime = new Date(data.server_time);
-            const clientOffset = new Date() - serverTime;
-            
-            function updateTimer() {
-                const now = new Date(Date.now() - clientOffset);
-                const timeLeft = nextUpdate - now;
-                
-                if (timeLeft <= 0) {
-                    location.reload();
-                    return;
-                }
-                
-                const minutes = Math.floor(timeLeft / 60000);
-                const seconds = Math.floor((timeLeft % 60000) / 1000);
-                
-                document.getElementById('countdown-timer').textContent = 
-                    `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-                
-                requestAnimationFrame(updateTimer);
-            }
-            
-            updateTimer();
-        })
-        .catch(error => {
-            console.error('Countdown error:', error);
-            startFallbackCountdown();
-        });
+    const nextUpdate = new Date({{ next_update|tojson }});
+    let lastCheck = new Date();
+
+    function updateTimer() {
+        const now = new Date();
+        const timeLeft = nextUpdate - now;
+
+        if (timeLeft <= 0) {
+            location.reload();
+            return;
+        }
+
+        // Format countdown
+        const minutes = Math.floor(timeLeft / 60000);
+        const seconds = Math.floor((timeLeft % 60000) / 1000);
+        
+        const timerElement = document.getElementById('countdown-timer');
+        if (timerElement) {
+            timerElement.textContent = 
+                `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        // Determine next tick
+        const nextTick = 1000 - (now.getMilliseconds());
+        setTimeout(updateTimer, nextTick);
+    }
+
+    updateTimer();
 }
 
 // Update LinkedIn posting interval to match news interval

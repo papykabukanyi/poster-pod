@@ -33,6 +33,7 @@ from urllib.parse import urlencode
 from services.twitter_service import TwitterService
 import tweepy
 from datetime import datetime
+from services.scheduler_service import SchedulerService
 
 # Add after imports
 logging.basicConfig(
@@ -307,6 +308,7 @@ def news_page():
     try:
         # Get news from shared cache
         articles = NewsService.get_cached_news()
+        next_update = NewsService.get_next_update_time()
         
         # Preload images
         all_articles = ([articles['breaking']] if articles['breaking'] else []) + articles['other']
@@ -316,10 +318,11 @@ def news_page():
                              breaking_news=articles['breaking'],
                              other_news=articles['other'],
                              preloaded_images=preloaded_images,
-                             total_articles=articles['total'])
+                             total_articles=articles['total'],
+                             next_update=next_update.isoformat())
     except Exception as e:
-        print(f"Error in news_page: {e}")
-        return "Error loading news", 500
+        logging.error(f"Error in news_page: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/static/images/default-news.jpg')
 def default_news_image():
@@ -486,6 +489,8 @@ def init_app(app):
     with app.app_context():
         init_db()
         NewsService.start_scheduler()
+        scheduler = SchedulerService()
+        scheduler.start()
 
 if __name__ == '__main__':
     init_app(app)
