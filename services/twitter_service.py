@@ -3,6 +3,7 @@ import tweepy
 import logging
 import google.generativeai as genai
 from datetime import datetime, timedelta
+from services.image_service import ImageService
 from config import (
     TWITTER_API_KEY,
     TWITTER_API_SECRET,
@@ -14,10 +15,11 @@ from config import (
 class TwitterService:
     def __init__(self):
         try:
-            self.auth = tweepy.OAuthHandler(TWITTER_API_KEY, TWITTER_API_SECRET)
-            self.auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET)
-            self.api = tweepy.API(self.auth)
-            self.client = tweepy.Client(
+            # Initialize both v1 and v2 clients
+            auth = tweepy.OAuthHandler(TWITTER_API_KEY, TWITTER_API_SECRET)
+            auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET)
+            self.api = tweepy.API(auth)  # v1 API for media upload
+            self.client = tweepy.Client(  # v2 API for tweets
                 consumer_key=TWITTER_API_KEY,
                 consumer_secret=TWITTER_API_SECRET,
                 access_token=TWITTER_ACCESS_TOKEN,
@@ -59,8 +61,8 @@ class TwitterService:
 
     def post_article(self, article):
         try:
-            if not self.client:
-                logging.error("Twitter client not initialized")
+            if not self.client or not self.api:
+                logging.error("Twitter clients not initialized")
                 return False
 
             current_time = datetime.utcnow()
@@ -72,10 +74,32 @@ class TwitterService:
                     logging.info(f"Skipping Twitter post - only {time_since_last} seconds since last post")
                     return False
 
-            caption = self._generate_caption(article)
-            response = self.client.create_tweet(text=caption)
+            # Get watermarked image
+            if article.image_url:
+                try:
+                    image_path = article.image_url.lstrip('/')
+                    watermarked_image = ImageService.add_watermark(image_path)
+                    
+                    # Upload media using v1 API
+                    media = self.api.media_upload(filename=watermarked_image)
+                    
+                    # Create tweet with media using v2 API
+                    caption = self._generate_caption(article)
+                    response = self.client.create_tweet(
+                        text=caption,
+                        media_ids=[media.media_id]
+                    )
+                except Exception as e:
+                    logging.error(f"Media upload error: {e}")
+                    # Fallback to text-only tweet
+                    caption = self._generate_caption(article)
+                    response = self.client.create_tweet(text=caption)
+            else:
+                # Text-only tweet
+                caption = self._generate_caption(article)
+                response = self.client.create_tweet(text=caption)
             
-            if response.data:
+            if hasattr(response, 'data') and response.data:
                 self.last_post_time = current_time
                 logging.info(f"Successfully posted to Twitter at {current_time}")
                 return True

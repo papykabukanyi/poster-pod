@@ -215,3 +215,45 @@ class ImageService:
         except Exception as e:
             logging.error(f"Error preloading images: {e}")
             return []
+
+    @staticmethod
+    def add_watermark(image_path):
+        """Add logo watermark to image"""
+        try:
+            # Open the main image
+            with Image.open(image_path) as img:
+                # Convert RGBA to RGB if needed
+                if img.mode in ('RGBA', 'LA'):
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    background.paste(img, mask=img.split()[-1])
+                    img = background
+                elif img.mode != 'RGB':
+                    img = img.convert('RGB')
+
+                # Open the logo
+                logo_path = "static/images/logo.png"  # Create this file
+                with Image.open(logo_path) as logo:
+                    # Calculate logo size (20% of image width)
+                    logo_size = int(img.size[0] * 0.2)
+                    logo = logo.resize((logo_size, logo_size))
+
+                    # Calculate position (bottom right corner with padding)
+                    position = (
+                        img.size[0] - logo_size - 20,  # 20px padding
+                        img.size[1] - logo_size - 20
+                    )
+
+                    # Create mask for transparent logo
+                    if logo.mode == 'RGBA':
+                        img.paste(logo, position, logo)
+                    else:
+                        img.paste(logo, position)
+
+                # Save with watermark
+                watermarked_path = f"{os.path.splitext(image_path)[0]}_watermarked.jpg"
+                img.save(watermarked_path, 'JPEG', quality=85)
+                return watermarked_path
+
+        except Exception as e:
+            logging.error(f"Error adding watermark: {e}")
+            return image_path
