@@ -6,6 +6,7 @@ import base64
 import uuid
 import logging
 from datetime import datetime, timedelta
+import tweepy
 from services.news_service import NewsService
 from services.image_service import ImageService
 from services.twitter_service import TwitterService  # Add this import
@@ -145,28 +146,45 @@ class SchedulerService:
                 current_time = datetime.utcnow()
 
                 # News update (every 2 hours)
-                if not self.last_news_update or current_time >= self.next_news_update:
-                    self.logger.info("Running scheduled news update")
-                    if NewsService.fetch_news(force_breaking=True):  # Using class method
-                        self.last_news_update = current_time
-                        self._next_news_update = current_time + timedelta(seconds=self.news_interval)
-                        self.logger.info(f"News updated at {current_time}")
+                try:
+                    if not self.last_news_update or current_time >= self.next_news_update:
+                        self.logger.info("Running scheduled news update")
+                        if NewsService.fetch_news(force_breaking=True):
+                            self.last_news_update = current_time
+                            self._next_news_update = current_time + timedelta(seconds=self.news_interval)
+                            self.logger.info(f"News updated at {current_time}")
+                except Exception as e:
+                    self.logger.error(f"News update error: {e}")
 
                 # Twitter post (every 30 minutes)
-                if not self.last_twitter_update or current_time >= self.next_twitter_update:
-                    cached_news = NewsService.get_cached_news()
-                    if cached_news and cached_news.get('breaking'):
-                        if self.twitter_service.post_article(cached_news['breaking']):
-                            self.last_twitter_update = current_time
-                            self._next_twitter_update = current_time + timedelta(seconds=self.twitter_interval)
-                            self.logger.info(f"Twitter post at {current_time}")
+                try:
+                    if not self.last_twitter_update or current_time >= self.next_twitter_update:
+                        cached_news = NewsService.get_cached_news()
+                        if cached_news and cached_news.get('breaking'):
+                            if self.twitter_service.post_article(cached_news['breaking']):
+                                self.last_twitter_update = current_time
+                                self._next_twitter_update = current_time + timedelta(seconds=self.twitter_interval)
+                                self.logger.info(f"Twitter post at {current_time}")
+                except tweepy.TooManyRequests as e:
+                    retry_after = int(e.response.headers.get('x-rate-limit-reset', 900))
+                    self.logger.warning(f"Twitter rate limit hit, waiting {retry_after} seconds")
+                    self._next_twitter_update = current_time + timedelta(seconds=retry_after)
+                except Exception as e:
+                    self.logger.error(f"Twitter post error: {e}")
 
-                # Trending engagement check
-                if not self.last_trending_update or current_time >= self.next_trending_update:
-                    if self.twitter_service.engage_trending_accounts():
-                        self.last_trending_update = current_time
-                        self._next_trending_update = current_time + timedelta(seconds=self.trending_interval)
-                        self.logger.info(f"Trending engagement at {current_time}")
+                # Trending engagement check with rate limit handling
+                try:
+                    if not self.last_trending_update or current_time >= self.next_trending_update:
+                        if self.twitter_service.engage_trending_accounts():
+                            self.last_trending_update = current_time
+                            self._next_trending_update = current_time + timedelta(seconds=self.trending_interval)
+                            self.logger.info(f"Trending engagement at {current_time}")
+                except tweepy.TooManyRequests as e:
+                    retry_after = int(e.response.headers.get('x-rate-limit-reset', 900))
+                    self.logger.warning(f"Twitter rate limit hit, waiting {retry_after} seconds")
+                    self._next_trending_update = current_time + timedelta(seconds=retry_after)
+                except Exception as e:
+                    self.logger.error(f"Trending engagement error: {e}")
 
                 # Cleanup (every 12 hours)
                 if (current_time - self.last_cleanup).total_seconds() >= self.cleanup_interval:

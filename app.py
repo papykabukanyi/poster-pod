@@ -451,9 +451,12 @@ def linkedin_manager():
 def twitter_manager():
     try:
         scheduler = SchedulerService.get_instance()
-        twitter_service = scheduler.twitter_service  # Use scheduler's instance
+        twitter_service = scheduler.twitter_service
         current_time = datetime.utcnow()
         is_connected = twitter_service.check_connection()
+        
+        # Get logs from database
+        activity_logs = twitter_service.get_recent_logs(limit=10)
         
         return render_template(
             'twitter_manager.html',
@@ -461,7 +464,7 @@ def twitter_manager():
             next_twitter_post=scheduler.next_twitter_update.isoformat(),
             next_trending_post=scheduler.next_trending_update.isoformat(),
             server_time=current_time.isoformat(),
-            activity_logs=twitter_service.activity_logs[:10],  # Show last 10 activities
+            activity_logs=activity_logs,
             hide_preloader=True
         )
     except Exception as e:
@@ -492,10 +495,16 @@ def run_migration():
     """Run database migrations"""
     try:
         with engine.connect() as connection:
+            # Execute existing migrations
             with open('migrations/alter_news_articles.sql') as f:
                 connection.execute(text(f.read()))
-                connection.commit()
-        print("Migration completed successfully")
+            
+            # Execute new activity_logs migration
+            with open('migrations/add_activity_logs.sql') as f:
+                connection.execute(text(f.read()))
+                
+            connection.commit()
+        print("Migrations completed successfully")
     except Exception as e:
         print(f"Migration error: {e}")
 
