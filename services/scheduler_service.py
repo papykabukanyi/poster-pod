@@ -39,11 +39,6 @@ class SchedulerService:
         
         self.logger = logging.getLogger(__name__)
 
-        # Add to existing init
-        self.last_trending_update = None
-        self.trending_interval = 900  # 15 minutes
-        self._next_trending_update = None
-
     def initialize(self):
         """Initial fetch of news and Twitter post"""
         try:
@@ -77,14 +72,6 @@ class SchedulerService:
             current_time = datetime.utcnow()
             self._next_news_update = current_time + timedelta(seconds=self.news_interval)
         return self._next_news_update
-
-    @property
-    def next_trending_update(self):
-        """Get next trending engagement time"""
-        current_time = datetime.utcnow()
-        if not self._next_trending_update or current_time >= self._next_trending_update:
-            self._next_trending_update = current_time + timedelta(seconds=self.trending_interval)
-        return self._next_trending_update
 
     def get_next_update(self):
         return self.next_news_update
@@ -171,20 +158,6 @@ class SchedulerService:
                     self._next_twitter_update = current_time + timedelta(seconds=retry_after)
                 except Exception as e:
                     self.logger.error(f"Twitter post error: {e}")
-
-                # Trending engagement check with rate limit handling
-                try:
-                    if not self.last_trending_update or current_time >= self.next_trending_update:
-                        if self.twitter_service.engage_trending_accounts():
-                            self.last_trending_update = current_time
-                            self._next_trending_update = current_time + timedelta(seconds=self.trending_interval)
-                            self.logger.info(f"Trending engagement at {current_time}")
-                except tweepy.TooManyRequests as e:
-                    retry_after = int(e.response.headers.get('x-rate-limit-reset', 900))
-                    self.logger.warning(f"Twitter rate limit hit, waiting {retry_after} seconds")
-                    self._next_trending_update = current_time + timedelta(seconds=retry_after)
-                except Exception as e:
-                    self.logger.error(f"Trending engagement error: {e}")
 
                 # Cleanup (every 12 hours)
                 if (current_time - self.last_cleanup).total_seconds() >= self.cleanup_interval:

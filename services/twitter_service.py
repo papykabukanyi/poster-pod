@@ -33,15 +33,6 @@ class TwitterService:
                 wait_on_rate_limit=True  # Change to True to handle rate limits internally
             )
             
-            # Initialize Gemini
-            try:
-                genai.configure(api_key=GEMINI_API_KEY)
-                self.model = genai.GenerativeModel('gemini-pro')
-                logging.info("Gemini AI initialized successfully")
-            except Exception as e:
-                logging.warning(f"Gemini init error: {e}")
-                self.model = None
-
             # Initialize V1 API for media uploads
             self.v1_auth = tweepy.OAuthHandler(
                 TWITTER_API_KEY, 
@@ -53,21 +44,25 @@ class TwitterService:
             )
             self.v1_api = tweepy.API(self.v1_auth)
             
-            # Initialize tracking attributes
+            # Initialize Gemini AI
+            try:
+                genai.configure(api_key=GEMINI_API_KEY)
+                self.model = genai.GenerativeModel('gemini-pro')
+                logging.info("Gemini AI initialized successfully")
+            except Exception as e:
+                logging.warning(f"Gemini init error: {e}")
+                self.model = None
+            
+            # Initialize other attributes
             self.last_post_time = None
-            self.last_trending_engagement = None
             self.post_interval = 1800  # 30 minutes
-            self.trending_interval = 900  # 15 minutes
             self.retry_count = 0
             self.max_retries = 3
+            self.api_timeout = 30
+            self.post_timeout = 60
             
-            # Initialize executor for background tasks
+            # Initialize executor
             self.executor = ThreadPoolExecutor(max_workers=3)
-            
-            # Add timeout settings
-            self.api_timeout = 30  # Increase timeout to 30 seconds
-            self.post_timeout = 60  # Separate timeout for posts
-            self.background_tasks = []
             
             self._add_activity_log('init', 'Twitter service initialized successfully')
             logging.info("Twitter service initialized successfully")
@@ -239,18 +234,18 @@ class TwitterService:
     def _generate_tweet_text(self, article):
         """Generate tweet text using Gemini AI with fallback"""
         try:
-            if self.model:
+            if hasattr(self, 'model') and self.model:
                 prompt = f"""
                 Create a compelling tweet (max 280 chars) about this news:
                 Title: {article.title}
                 Description: {article.description}
-                include popular hashtags 2 or 3 of them
-                Include the URL: www.onposter.site/news
+                Include 2-3 relevant hashtags
+                Include URL: www.onposter.site/news
                 Make it engaging but professional.
                 """
                 
                 response = self.model.generate_content(prompt)
-                if response and response.text:
+                if response and hasattr(response, 'text'):
                     tweet = response.text.strip()
                     # Ensure URL is included
                     if "www.onposter.site/news" not in tweet:
@@ -258,11 +253,13 @@ class TwitterService:
                     return tweet[:280]
                     
             # Fallback to basic generation
-            return f"{article.title[:100]}...\n\nRead more: www.onposter.site/news"
+            hashtags = "#BreakingNews #News"
+            base_text = f"{article.title[:180]}..."
+            return f"{base_text}\n\n{hashtags}\nRead more: www.onposter.site/news"
             
         except Exception as e:
             logging.error(f"AI text generation error: {e}")
-            return "Breaking news update at www.onposter.site/news"
+            return f"Breaking News: {article.title[:180]}... www.onposter.site/news #News"
 
     def get_recent_logs(self, limit=10):
         """Get recent activity logs with retry"""
@@ -278,88 +275,6 @@ class TwitterService:
                 logging.error(f"Log fetch error (attempt {attempt+1}): {e}")
                 time.sleep(1)
         return []  # Return empty list if all retries fail
-
-    def engage_trending_accounts(self):
-        """Engage with trending accounts"""
-        try:
-            if not self.client:
-                return False
-
-            current_time = datetime.utcnow()
-            if self.last_trending_engagement:
-                time_since_last = (current_time - self.last_trending_engagement).total_seconds()
-                if time_since_last < self.trending_interval:
-                    return False
-
-            # Submit trending engagement to executor
-            future = self.executor.submit(self._engage_trending_task)
-            
-            try:
-                result = future.result(timeout=self.post_timeout)
-                if result:
-                    self.last_trending_engagement = current_time
-                    return True
-            except concurrent.futures.TimeoutError:
-                logging.error("Trending engagement timed out")
-                return False
-
-            return False
-
-        except Exception as e:
-            logging.error(f"Trending engagement error: {e}")
-            self._add_activity_log('error', f"Trending engagement error: {str(e)}")
-            return False
-
-    def _engage_trending_task(self):
-        """Background task for trending engagement"""
-        try:
-            # Search for recent tweets about news
-            tweets = self.client.search_recent_tweets(
-                query="breaking news -is:retweet -is:reply",
-                max_results=10,
-                tweet_fields=['author_id', 'public_metrics']
-            )
-            
-            if not tweets.data:
-                return False
-
-            for tweet in tweets.data:
-                try:
-                    # Get user details
-                    author = self.client.get_user(
-                        id=tweet.author_id,
-                        user_fields=['public_metrics']
-                    )
-                    
-                    if author.data.public_metrics['followers_count'] >= 10000:
-                        # Create reply
-                        response = self.client.create_tweet(
-                            text="www.onposter.site/news | www.onposter.site",
-                            in_reply_to_tweet_id=tweet.id
-                        )
-                        
-                        if response.data:
-                            self._add_activity_log(
-                                'engage', 
-                                f"Engaged with user (followers: {author.data.public_metrics['followers_count']})"
-                            )
-                            return True
-                            
-                except tweepy.TooManyRequests as e:
-                    wait_time = self._handle_rate_limit(e)
-                    if wait_time:
-                        time.sleep(min(wait_time, 5))  # Limited sleep
-                    continue
-                    
-                except Exception as e:
-                    logging.error(f"Tweet engagement error: {e}")
-                    continue
-
-            return False
-
-        except Exception as e:
-            logging.error(f"Trending task error: {e}")
-            return False
 
     def __del__(self):
         """Cleanup executor on service deletion"""

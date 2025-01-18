@@ -455,16 +455,12 @@ def twitter_manager():
         current_time = datetime.utcnow()
         is_connected = twitter_service.check_connection()
         
-        # Get logs from database
-        activity_logs = twitter_service.get_recent_logs(limit=10)
-        
         return render_template(
             'twitter_manager.html',
             is_connected=is_connected,
             next_twitter_post=scheduler.next_twitter_update.isoformat(),
-            next_trending_post=scheduler.next_trending_update.isoformat(),
             server_time=current_time.isoformat(),
-            activity_logs=activity_logs,
+            activity_logs=twitter_service.get_recent_logs(limit=10),
             hide_preloader=True
         )
     except Exception as e:
@@ -475,7 +471,6 @@ def twitter_manager():
             error=str(e),
             activity_logs=[],
             next_twitter_post=(datetime.utcnow() + timedelta(seconds=1800)).isoformat(),
-            next_trending_post=(datetime.utcnow() + timedelta(seconds=900)).isoformat(),
             server_time=datetime.utcnow().isoformat(),
             hide_preloader=True
         )

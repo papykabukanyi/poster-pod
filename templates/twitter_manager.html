@@ -29,20 +29,13 @@
                 </div>
 
                 <div class="space-y-4 mb-8">
-                    <!-- Timers -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="bg-gray-900/50 rounded-lg p-4">
-                            <h3 class="text-[#A4A5A6] text-sm font-medium mb-2">Next Post</h3>
-                            <div id="twitter-countdown" class="text-2xl text-white font-mono">00:00</div>
-                        </div>
-                        
-                        <div class="bg-gray-900/50 rounded-lg p-4">
-                            <h3 class="text-[#A4A5A6] text-sm font-medium mb-2">Next Engagement</h3>
-                            <div id="trending-countdown" class="text-2xl text-white font-mono">00:00</div>
-                        </div>
+                    <!-- Timer -->
+                    <div class="bg-gray-900/50 rounded-lg p-4">
+                        <h3 class="text-[#A4A5A6] text-sm font-medium mb-2">Next Post</h3>
+                        <div id="twitter-countdown" class="text-2xl text-white font-mono">00:00</div>
                     </div>
-
-                    <!-- Activity Log -->
+                    
+                    <!-- Activity Log remains the same -->
                     <div class="mt-8">
                         <h3 class="text-[#A4A5A6] text-lg font-medium mb-4">Recent Activity</h3>
                         <div class="bg-gray-900/30 rounded-lg overflow-hidden">
@@ -95,7 +88,6 @@ function disconnectTwitter() {
 
 function initializeCountdowns() {
     const nextPost = new Date("{{ next_twitter_post }}");
-    const nextTrending = new Date("{{ next_trending_post }}");
     const serverTime = new Date("{{ server_time }}");
     const localTime = new Date();
     const timeDiff = localTime - serverTime;
@@ -103,30 +95,18 @@ function initializeCountdowns() {
     function updateCountdowns() {
         const now = new Date();
         const adjustedNow = new Date(now.getTime() - timeDiff);
-
-        // Update post countdown
         const postTimeLeft = Math.max(0, nextPost - adjustedNow);
         const postMinutes = Math.floor(postTimeLeft / 60000);
         const postSeconds = Math.floor((postTimeLeft % 60000) / 1000);
         
         document.getElementById('twitter-countdown').textContent = 
             `${String(postMinutes).padStart(2, '0')}:${String(postSeconds).padStart(2, '0')}`;
-
-        // Update trending countdown
-        const trendingTimeLeft = Math.max(0, nextTrending - adjustedNow);
-        const trendingMinutes = Math.floor(trendingTimeLeft / 60000);
-        const trendingSeconds = Math.floor((trendingTimeLeft % 60000) / 1000);
-        
-        document.getElementById('trending-countdown').textContent = 
-            `${String(trendingMinutes).padStart(2, '0')}:${String(trendingSeconds).padStart(2, '0')}`;
     }
 
-    // Update immediately and every second
     updateCountdowns();
     setInterval(updateCountdowns, 1000);
 }
 
-// Initialize once when document loads
 document.addEventListener('DOMContentLoaded', initializeCountdowns);
 </script>
 {% endblock %}
