@@ -38,6 +38,11 @@ class SchedulerService:
         
         self.logger = logging.getLogger(__name__)
 
+        # Add to existing init
+        self.last_trending_update = None
+        self.trending_interval = 900  # 15 minutes
+        self._next_trending_update = None
+
     def initialize(self):
         """Initial fetch of news and Twitter post"""
         try:
@@ -71,6 +76,14 @@ class SchedulerService:
             current_time = datetime.utcnow()
             self._next_news_update = current_time + timedelta(seconds=self.news_interval)
         return self._next_news_update
+
+    @property
+    def next_trending_update(self):
+        """Get next trending engagement time"""
+        current_time = datetime.utcnow()
+        if not self._next_trending_update or current_time >= self._next_trending_update:
+            self._next_trending_update = current_time + timedelta(seconds=self.trending_interval)
+        return self._next_trending_update
 
     def get_next_update(self):
         return self.next_news_update
@@ -147,6 +160,13 @@ class SchedulerService:
                             self.last_twitter_update = current_time
                             self._next_twitter_update = current_time + timedelta(seconds=self.twitter_interval)
                             self.logger.info(f"Twitter post at {current_time}")
+
+                # Trending engagement check
+                if not self.last_trending_update or current_time >= self.next_trending_update:
+                    if self.twitter_service.engage_trending_accounts():
+                        self.last_trending_update = current_time
+                        self._next_trending_update = current_time + timedelta(seconds=self.trending_interval)
+                        self.logger.info(f"Trending engagement at {current_time}")
 
                 # Cleanup (every 12 hours)
                 if (current_time - self.last_cleanup).total_seconds() >= self.cleanup_interval:

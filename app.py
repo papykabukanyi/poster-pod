@@ -459,17 +459,20 @@ def twitter_manager():
             'twitter_manager.html',
             is_connected=is_connected,
             next_twitter_post=scheduler.next_twitter_update.isoformat(),
-            server_time=current_time.isoformat(),  # Add server time
+            next_trending_post=scheduler.next_trending_update.isoformat(),
+            server_time=current_time.isoformat(),
             hide_preloader=True
         )
     except Exception as e:
         logging.error(f"Twitter manager error: {e}")
+        current_time = datetime.utcnow()
         return render_template(
             'twitter_manager.html',
             is_connected=False,
             error=str(e),
-            next_twitter_post=(datetime.utcnow() + timedelta(seconds=1800)).isoformat(),
-            server_time=datetime.utcnow().isoformat(),
+            next_twitter_post=(current_time + timedelta(seconds=1800)).isoformat(),
+            next_trending_post=(current_time + timedelta(seconds=900)).isoformat(),
+            server_time=current_time.isoformat(),
             hide_preloader=True
         )
 

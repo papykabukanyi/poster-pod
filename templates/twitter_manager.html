@@ -28,9 +28,16 @@
                     {% endif %}
                 </div>
 
-                <!-- Next Post Timer -->
-                <div class="mt-4 text-sm text-[#A4A5A6]">
-                    Next Twitter post in: <span id="twitter-countdown" class="font-bold">00:00</span>
+                <div class="space-y-4">
+                    <!-- Next Post Timer -->
+                    <div class="mt-4 text-sm text-[#A4A5A6]">
+                        Next Twitter post in: <span id="twitter-countdown" class="font-bold">00:00</span>
+                    </div>
+
+                    <!-- Next Trending Timer -->
+                    <div class="mt-4 text-sm text-[#A4A5A6]">
+                        Next trending engagement in: <span id="trending-countdown" class="font-bold">00:00</span>
+                    </div>
                 </div>
 
                 {% if error %}
@@ -51,45 +58,40 @@ function disconnectTwitter() {
     }
 }
 
-function initializeTwitterCountdown() {
+function initializeCountdowns() {
     const nextPost = new Date("{{ next_twitter_post }}");
-    const serverTime = new Date("{{ server_time }}");  // Add this to your template context
+    const nextTrending = new Date("{{ next_trending_post }}");
+    const serverTime = new Date("{{ server_time }}");
     const localTime = new Date();
-    const timeDiff = localTime - serverTime;  // Time difference between local and server
-    let countdownInterval;
+    const timeDiff = localTime - serverTime;
 
-    function updateCountdown() {
+    function updateCountdowns() {
         const now = new Date();
-        const adjustedNow = new Date(now.getTime() - timeDiff);  // Adjust for server time
-        const timeLeft = nextPost - adjustedNow;
+        const adjustedNow = new Date(now.getTime() - timeDiff);
 
-        if (timeLeft <= 0) {
-            clearInterval(countdownInterval);
-            location.reload();
-            return;
-        }
-
-        const minutes = Math.floor(timeLeft / 60000);
-        const seconds = Math.floor((timeLeft % 60000) / 1000);
+        // Update Twitter post countdown
+        const postTimeLeft = nextPost - adjustedNow;
+        const postMinutes = Math.floor(postTimeLeft / 60000);
+        const postSeconds = Math.floor((postTimeLeft % 60000) / 1000);
         
-        const timerElement = document.getElementById('twitter-countdown');
-        if (timerElement) {
-            timerElement.textContent = 
-                `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-        }
+        document.getElementById('twitter-countdown').textContent = 
+            `${String(postMinutes).padStart(2, '0')}:${String(postSeconds).padStart(2, '0')}`;
+
+        // Update Trending countdown
+        const trendingTimeLeft = nextTrending - adjustedNow;
+        const trendingMinutes = Math.floor(trendingTimeLeft / 60000);
+        const trendingSeconds = Math.floor((trendingTimeLeft % 60000) / 1000);
+        
+        document.getElementById('trending-countdown').textContent = 
+            `${String(trendingMinutes).padStart(2, '0')}:${String(trendingSeconds).padStart(2, '0')}`;
     }
 
-    // Update immediately and then every second
-    updateCountdown();
-    countdownInterval = setInterval(updateCountdown, 1000);
-
-    // Cleanup on page unload
-    window.addEventListener('unload', () => {
-        clearInterval(countdownInterval);
-    });
+    // Update immediately and every second
+    updateCountdowns();
+    setInterval(updateCountdowns, 1000);
 }
 
 // Initialize once when document loads
-document.addEventListener('DOMContentLoaded', initializeTwitterCountdown);
+document.addEventListener('DOMContentLoaded', initializeCountdowns);
 </script>
 {% endblock %}

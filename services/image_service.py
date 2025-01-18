@@ -1,12 +1,14 @@
+from PIL import Image, ImageDraw, ImageFont  # Add ImageDraw and ImageFont
 import os
 import requests
 from bs4 import BeautifulSoup
 from config import UNSPLASH_ACCESS_KEY
 import hashlib
-from PIL import Image
+import tweepy
 from io import BytesIO
 import time
 import logging
+from datetime import datetime
 
 # Optional: Add basic logging configuration if not configured elsewhere
 logging.basicConfig(
@@ -217,10 +219,9 @@ class ImageService:
             return []
 
     @staticmethod
-    def add_watermark(image_path):
-        """Add logo watermark to image"""
+    def add_watermark(image_path, text="www.onposter.site/news | www.onposter.site"):
+        """Add text watermark to image"""
         try:
-            # Open the main image
             with Image.open(image_path) as img:
                 # Convert RGBA to RGB if needed
                 if img.mode in ('RGBA', 'LA'):
@@ -230,24 +231,27 @@ class ImageService:
                 elif img.mode != 'RGB':
                     img = img.convert('RGB')
 
-                # Open the logo
-                logo_path = "static/images/logo.png"  # Create this file
-                with Image.open(logo_path) as logo:
-                    # Calculate logo size (20% of image width)
-                    logo_size = int(img.size[0] * 0.2)
-                    logo = logo.resize((logo_size, logo_size))
+                # Create a drawing object
+                draw = ImageDraw.Draw(img)
+                
+                # Calculate text size (30% of image width)
+                fontsize = int(img.size[0] * 0.03)
+                try:
+                    font = ImageFont.truetype("Arial.ttf", fontsize)
+                except:
+                    font = ImageFont.load_default()
 
-                    # Calculate position (bottom right corner with padding)
-                    position = (
-                        img.size[0] - logo_size - 20,  # 20px padding
-                        img.size[1] - logo_size - 20
-                    )
+                # Calculate text position (bottom center)
+                text_width = draw.textlength(text, font=font)
+                x = (img.size[0] - text_width) / 2
+                y = img.size[1] - (fontsize * 2)
 
-                    # Create mask for transparent logo
-                    if logo.mode == 'RGBA':
-                        img.paste(logo, position, logo)
-                    else:
-                        img.paste(logo, position)
+                # Add shadow/outline for better visibility
+                for offset in [(1,1), (-1,-1), (1,-1), (-1,1)]:
+                    draw.text((x+offset[0], y+offset[1]), text, font=font, fill='black')
+
+                # Draw main text
+                draw.text((x,y), text, font=font, fill='white')
 
                 # Save with watermark
                 watermarked_path = f"{os.path.splitext(image_path)[0]}_watermarked.jpg"
@@ -257,3 +261,83 @@ class ImageService:
         except Exception as e:
             logging.error(f"Error adding watermark: {e}")
             return image_path
+
+def post_article(self, article):
+    """Post article to Twitter using v2 API"""
+    try:
+        if not self.client or not self.v1_api:
+            logging.error("Twitter API not initialized")
+            return False
+
+        current_time = datetime.utcnow()
+        
+        # Check posting interval
+        if self.last_post_time:
+            time_since_last = (current_time - self.last_post_time).total_seconds()
+            if time_since_last < self.post_interval:
+                logging.info(f"Rate limit: Waiting {self.post_interval - time_since_last} seconds")
+                return False
+
+        # Generate caption
+        caption = self._generate_caption(article)
+        
+        # Handle image with watermark
+        media_id = None
+        if article.image_url and os.path.exists(article.image_url.lstrip('/')):
+            try:
+                # Create watermark path
+                original_path = article.image_url.lstrip('/')
+                watermark_path = f"{os.path.splitext(original_path)[0]}_watermarked.jpg"
+                
+                # Add watermark
+                watermarked_path = ImageService.add_watermark(
+                    original_path,
+                    "www.onposter.site/news | www.onposter.site"
+                )
+                
+                if watermarked_path and os.path.exists(watermarked_path):
+                    # Upload watermarked image
+                    media = self.v1_api.media_upload(watermarked_path)
+                    media_id = media.media_id
+                    
+                    # Clean up watermarked file after upload
+                    try:
+                        os.remove(watermarked_path)
+                    except Exception as e:
+                        logging.error(f"Error cleaning up watermarked image: {e}")
+                
+            except Exception as e:
+                logging.error(f"Media processing error: {e}")
+                # Continue without image if there's an error
+
+        # Post tweet
+        try:
+            tweet_params = {'text': caption}
+            if media_id:
+                tweet_params['media_ids'] = [media_id]
+                
+            response = self.client.create_tweet(**tweet_params)
+            
+            if response.data:
+                self.last_post_time = current_time
+                self.retry_count = 0
+                logging.info(f"Successfully posted to Twitter at {current_time}")
+                return True
+
+        except tweepy.TweepyException as e:
+            if "duplicate" in str(e).lower():
+                # Add timestamp to avoid duplicate
+                caption = f"{caption} {current_time.strftime('%H:%M:%S')}"
+                return self.post_article(article)
+            
+            if self.retry_count < self.max_retries:
+                self.retry_count += 1
+                time.sleep(2 ** self.retry_count)
+                return self.post_article(article)
+                
+            logging.error(f"Twitter post error after {self.max_retries} retries: {e}")
+            return False
+
+    except Exception as e:
+        logging.error(f"Twitter post error: {e}")
+        return False
