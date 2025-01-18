@@ -58,11 +58,16 @@ class TwitterService:
             self.post_interval = 1800  # 30 minutes
             self.retry_count = 0
             self.max_retries = 3
-            self.api_timeout = 30
-            self.post_timeout = 60
+            self.api_timeout = 5  # 5 seconds for API calls
+            self.post_timeout = 10  # 10 seconds for posts
             
-            # Initialize executor
-            self.executor = ThreadPoolExecutor(max_workers=3)
+            # Connection status cache
+            self.last_connection_check = None
+            self.connection_cache_ttl = 300  # Cache connection status for 5 minutes
+            self.is_connected = False
+            
+            # Initialize executor with cleanup
+            self.executor = ThreadPoolExecutor(max_workers=2)
             
             self._add_activity_log('init', 'Twitter service initialized successfully')
             logging.info("Twitter service initialized successfully")
@@ -74,28 +79,35 @@ class TwitterService:
             self.model = None
 
     def check_connection(self):
-        """Non-blocking connection check"""
+        """Quick connection check with caching"""
         try:
-            if not self.client or not self.v1_api:
-                return False
+            current_time = datetime.utcnow()
+            
+            # Return cached result if valid
+            if (self.last_connection_check and 
+                (current_time - self.last_connection_check).total_seconds() < self.connection_cache_ttl):
+                return self.is_connected
                 
-            # Quick check with timeout
-            future = self.executor.submit(
-                partial(self.client.get_me, user_fields=['public_metrics'])
-            )
-            result = future.result(timeout=self.api_timeout)
+            if not self.client:
+                self.is_connected = False
+                return False
             
-            return bool(result.data)
+            # Quick API check without waiting
+            try:
+                me = self.client.get_me()
+                self.is_connected = bool(me.data)
+            except tweepy.TooManyRequests:
+                # Consider still connected if rate limited
+                self.is_connected = True
+            except Exception as e:
+                logging.error(f"Connection check failed: {e}")
+                self.is_connected = False
             
-        except concurrent.futures.TimeoutError:
-            logging.warning("Connection check timed out")
-            return False
-        except tweepy.TooManyRequests:
-            logging.warning("Rate limited during connection check")
-            return True  # Consider it connected
+            self.last_connection_check = current_time
+            return self.is_connected
+            
         except Exception as e:
-            logging.error(f"Connection check failed: {e}")
-            self._add_activity_log('error', f"Connection check failed: {str(e)}")
+            logging.error(f"Connection check error: {e}")
             return False
 
     def _add_activity_log(self, activity_type, message):
@@ -277,6 +289,9 @@ class TwitterService:
         return []  # Return empty list if all retries fail
 
     def __del__(self):
-        """Cleanup executor on service deletion"""
-        if hasattr(self, 'executor'):
-            self.executor.shutdown(wait=False)
+        """Cleanup on deletion"""
+        try:
+            if hasattr(self, 'executor'):
+                self.executor.shutdown(wait=False)
+        except Exception as e:
+            logging.error(f"Cleanup error: {e}")

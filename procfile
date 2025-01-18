@@ -1,2 +1,2 @@
 # Procfile
-web: gunicorn app:app --timeout 30 --workers 3 --threads 3 --worker-class gthread
+web: gunicorn app:app --timeout 30 --workers 3 --threads 3 --worker-class gthread --max-requests 1000 --max-requests-jitter 50
