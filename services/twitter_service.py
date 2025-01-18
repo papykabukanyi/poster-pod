@@ -52,12 +52,25 @@ class TwitterService:
             self.trending_interval = 900  # 15 minutes
             self.min_follower_count = 100000  # Minimum followers to engage
             
+            self.activity_logs = []
+            self.max_logs = 50  # Keep last 50 activities
+            
             logging.info("Twitter service initialized successfully")
             
         except Exception as e:
             logging.error(f"Twitter initialization error: {e}")
             self.client = None
             self.v1_api = None
+
+    def _add_activity_log(self, activity_type, message):
+        """Track activity with timestamp"""
+        log_entry = {
+            'timestamp': datetime.utcnow(),
+            'type': activity_type,
+            'message': message
+        }
+        self.activity_logs.insert(0, log_entry)
+        self.activity_logs = self.activity_logs[:self.max_logs]  # Keep only recent logs
 
     def post_article(self, article):
         """Post article to Twitter using v2 API"""
@@ -118,6 +131,7 @@ class TwitterService:
                     self.last_post_time = current_time
                     self.retry_count = 0
                     logging.info(f"Successfully posted to Twitter at {current_time}")
+                    self._add_activity_log('post', f"Posted: {article.title[:50]}...")
                     return True
 
             except tweepy.TweepyException as e:
@@ -132,10 +146,12 @@ class TwitterService:
                     return self.post_article(article)
                     
                 logging.error(f"Twitter post error after {self.max_retries} retries: {e}")
+                self._add_activity_log('error', f"Post error: {str(e)}")
                 return False
 
         except Exception as e:
             logging.error(f"Twitter post error: {e}")
+            self._add_activity_log('error', f"Post error: {str(e)}")
             return False
 
     def _generate_caption(self, article):
@@ -218,6 +234,7 @@ class TwitterService:
                                 in_reply_to_tweet_id=tweet.id
                             )
                             self.last_trending_engagement = current_time
+                            self._add_activity_log('engage', f"Engaged with trending topic: {trend['name']}")
                             return True
                         except Exception as e:
                             logging.error(f"Reply error: {e}")
@@ -227,4 +244,5 @@ class TwitterService:
 
         except Exception as e:
             logging.error(f"Trending engagement error: {e}")
+            self._add_activity_log('error', f"Engagement error: {str(e)}")
             return False

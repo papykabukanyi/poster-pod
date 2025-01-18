@@ -28,15 +28,50 @@
                     {% endif %}
                 </div>
 
-                <div class="space-y-4">
-                    <!-- Next Post Timer -->
-                    <div class="mt-4 text-sm text-[#A4A5A6]">
-                        Next Twitter post in: <span id="twitter-countdown" class="font-bold">00:00</span>
+                <div class="space-y-4 mb-8">
+                    <!-- Timers -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-gray-900/50 rounded-lg p-4">
+                            <h3 class="text-[#A4A5A6] text-sm font-medium mb-2">Next Post</h3>
+                            <div id="twitter-countdown" class="text-2xl text-white font-mono">00:00</div>
+                        </div>
+                        
+                        <div class="bg-gray-900/50 rounded-lg p-4">
+                            <h3 class="text-[#A4A5A6] text-sm font-medium mb-2">Next Engagement</h3>
+                            <div id="trending-countdown" class="text-2xl text-white font-mono">00:00</div>
+                        </div>
                     </div>
 
-                    <!-- Next Trending Timer -->
-                    <div class="mt-4 text-sm text-[#A4A5A6]">
-                        Next trending engagement in: <span id="trending-countdown" class="font-bold">00:00</span>
+                    <!-- Activity Log -->
+                    <div class="mt-8">
+                        <h3 class="text-[#A4A5A6] text-lg font-medium mb-4">Recent Activity</h3>
+                        <div class="bg-gray-900/30 rounded-lg overflow-hidden">
+                            <div class="divide-y divide-gray-800">
+                                {% for log in activity_logs %}
+                                <div class="p-4 flex items-start space-x-3">
+                                    <div class="flex-shrink-0">
+                                        {% if log.type == 'post' %}
+                                            <span class="text-blue-500">📝</span>
+                                        {% elif log.type == 'engage' %}
+                                            <span class="text-green-500">💬</span>
+                                        {% else %}
+                                            <span class="text-red-500">⚠️</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm text-[#A4A5A6]">{{ log.message }}</p>
+                                        <p class="text-xs text-gray-500 mt-1">
+                                            {{ log.timestamp|timeago }}
+                                        </p>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <div class="p-4 text-gray-500 text-sm">
+                                    No recent activity
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -69,16 +104,16 @@ function initializeCountdowns() {
         const now = new Date();
         const adjustedNow = new Date(now.getTime() - timeDiff);
 
-        // Update Twitter post countdown
-        const postTimeLeft = nextPost - adjustedNow;
+        // Update post countdown
+        const postTimeLeft = Math.max(0, nextPost - adjustedNow);
         const postMinutes = Math.floor(postTimeLeft / 60000);
         const postSeconds = Math.floor((postTimeLeft % 60000) / 1000);
         
         document.getElementById('twitter-countdown').textContent = 
             `${String(postMinutes).padStart(2, '0')}:${String(postSeconds).padStart(2, '0')}`;
 
-        // Update Trending countdown
-        const trendingTimeLeft = nextTrending - adjustedNow;
+        // Update trending countdown
+        const trendingTimeLeft = Math.max(0, nextTrending - adjustedNow);
         const trendingMinutes = Math.floor(trendingTimeLeft / 60000);
         const trendingSeconds = Math.floor((trendingTimeLeft % 60000) / 1000);
         
