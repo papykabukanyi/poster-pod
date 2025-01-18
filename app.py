@@ -313,7 +313,7 @@ def news_page():
         articles = NewsService.get_cached_news()
         
         all_articles = []
-        if articles.get('breaking'):
+        if (articles.get('breaking')):
             all_articles.append(articles['breaking'])
         all_articles.extend(articles.get('other', []))
         
@@ -453,6 +453,8 @@ def twitter_manager():
         scheduler = SchedulerService.get_instance()
         twitter_service = scheduler.twitter_service
         current_time = datetime.utcnow()
+        
+        # Use cached connection status
         is_connected = twitter_service.check_connection()
         
         return render_template(
@@ -469,7 +471,6 @@ def twitter_manager():
             'twitter_manager.html',
             is_connected=False,
             error=str(e),
-            activity_logs=[],
             next_twitter_post=(datetime.utcnow() + timedelta(seconds=1800)).isoformat(),
             server_time=datetime.utcnow().isoformat(),
             hide_preloader=True

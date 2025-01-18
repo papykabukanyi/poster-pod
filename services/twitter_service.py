@@ -30,7 +30,7 @@ class TwitterService:
                 consumer_secret=TWITTER_API_SECRET,
                 access_token=TWITTER_ACCESS_TOKEN,
                 access_token_secret=TWITTER_ACCESS_SECRET,
-                wait_on_rate_limit=True  # Change to True to handle rate limits internally
+                wait_on_rate_limit=False  # Handle manually
             )
             
             # Initialize V1 API for media uploads
@@ -62,9 +62,14 @@ class TwitterService:
             self.post_timeout = 10  # 10 seconds for posts
             
             # Connection status cache
-            self.last_connection_check = None
-            self.connection_cache_ttl = 300  # Cache connection status for 5 minutes
-            self.is_connected = False
+            self._connection_status = {
+                'is_connected': False,
+                'last_check': None,
+                'cache_ttl': 300  # 5 minutes
+            }
+            
+            # Initialize connection on startup
+            self._update_connection_status()
             
             # Initialize executor with cleanup
             self.executor = ThreadPoolExecutor(max_workers=2)
@@ -78,33 +83,39 @@ class TwitterService:
             self.v1_api = None
             self.model = None
 
-    def check_connection(self):
-        """Quick connection check with caching"""
+    def _update_connection_status(self):
+        """Update cached connection status"""
         try:
-            current_time = datetime.utcnow()
-            
-            # Return cached result if valid
-            if (self.last_connection_check and 
-                (current_time - self.last_connection_check).total_seconds() < self.connection_cache_ttl):
-                return self.is_connected
-                
             if not self.client:
-                self.is_connected = False
-                return False
-            
-            # Quick API check without waiting
+                self._connection_status['is_connected'] = False
+                return
+
             try:
                 me = self.client.get_me()
-                self.is_connected = bool(me.data)
+                self._connection_status['is_connected'] = bool(me.data)
             except tweepy.TooManyRequests:
-                # Consider still connected if rate limited
-                self.is_connected = True
+                self._connection_status['is_connected'] = True  # Consider connected if rate limited
             except Exception as e:
-                logging.error(f"Connection check failed: {e}")
-                self.is_connected = False
+                logging.error(f"Connection update failed: {e}")
+                self._connection_status['is_connected'] = False
+                
+            self._connection_status['last_check'] = datetime.utcnow()
             
-            self.last_connection_check = current_time
-            return self.is_connected
+        except Exception as e:
+            logging.error(f"Status update error: {e}")
+            self._connection_status['is_connected'] = False
+
+    def check_connection(self):
+        """Non-blocking connection check using cache"""
+        try:
+            current_time = datetime.utcnow()
+            last_check = self._connection_status['last_check']
+            
+            # Update if cache expired
+            if not last_check or (current_time - last_check).total_seconds() >= self._connection_status['cache_ttl']:
+                self._update_connection_status()
+                
+            return self._connection_status['is_connected']
             
         except Exception as e:
             logging.error(f"Connection check error: {e}")
