@@ -1,14 +1,14 @@
 <!-- templates/video_player.html -->
-{% extends "base.html" %}
+{% extends "video_base.html" %}
 
 {% block content %}
-<div class="min-h-screen bg-gray-100 dark:bg-gray-900">
-    <div class="container mx-auto px-4 py-8">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <!-- Main Video Column -->
-            <div class="lg:col-span-2">
+<div class="container mx-auto px-4 py-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Main Video Column -->
+        <div class="lg:col-span-2">
+            <div class="video-card bg-gray-900/80 backdrop-blur-sm rounded-lg overflow-hidden video-ambient">
                 <!-- Video Player -->
-                <div class="bg-black rounded-lg overflow-hidden">
+                <div class="video-container rounded-lg overflow-hidden">
                     <video 
                         id="mainVideo"
                         class="w-full aspect-video"
@@ -111,36 +111,36 @@
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Recommendations Column -->
-            <div class="lg:col-span-1">
-                <div class="bg-white dark:bg-gray-800 rounded-lg p-6">
-                    <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Up Next</h2>
-                    <div class="space-y-4">
-                        {% for rec in recommended %}
-                        <a href="{{ url_for('video_player', slug=rec.slug) }}" 
-                           class="flex space-x-4 group">
-                            <div class="flex-shrink-0 w-40 h-24 relative">
-                                <img src="{{ rec.thumbnail_url }}" 
-                                     alt="{{ rec.title }}" 
-                                     class="w-full h-full object-cover rounded-lg"/>
-                                {% if rec.duration %}
-                                <div class="absolute bottom-1 right-1 bg-black bg-opacity-75 px-1 rounded text-xs text-white">
-                                    {{ '%d:%02d'|format(rec.duration//60, rec.duration%60) }}
-                                </div>
-                                {% endif %}
+        <!-- Recommendations Column -->
+        <div class="lg:col-span-1">
+            <div class="video-card bg-gray-900/80 backdrop-blur-sm rounded-lg p-6">
+                <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Up Next</h2>
+                <div class="space-y-4">
+                    {% for rec in recommended %}
+                    <a href="{{ url_for('video_player', slug=rec.slug) }}" 
+                       class="flex space-x-4 group">
+                        <div class="flex-shrink-0 w-40 h-24 relative">
+                            <img src="{{ rec.thumbnail_url }}" 
+                                 alt="{{ rec.title }}" 
+                                 class="w-full h-full object-cover rounded-lg"/>
+                            {% if rec.duration %}
+                            <div class="absolute bottom-1 right-1 bg-black bg-opacity-75 px-1 rounded text-xs text-white">
+                                {{ '%d:%02d'|format(rec.duration//60, rec.duration%60) }}
                             </div>
-                            <div class="flex-1">
-                                <h3 class="font-medium text-gray-900 dark:text-white group-hover:text-blue-500">
-                                    {{ rec.title }}
-                                </h3>
-                                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                                    {{ rec.views }} views
-                                </p>
-                            </div>
-                        </a>
-                        {% endfor %}
-                    </div>
+                            {% endif %}
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-medium text-gray-900 dark:text-white group-hover:text-blue-500">
+                                {{ rec.title }}
+                            </h3>
+                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                {{ rec.views }} views
+                            </p>
+                        </div>
+                    </a>
+                    {% endfor %}
                 </div>
             </div>
         </div>
@@ -148,41 +148,59 @@
 </div>
 
 <script>
-// Auto-play next video when current video ends
-document.getElementById('mainVideo').addEventListener('ended', function() {
+document.getElementById('mainVideo').addEventListener('ended', async function() {
+    // Record view only when video is completed
+    try {
+        await fetch(`/video/{{ video.slug }}/view`, {
+            method: 'POST'
+        });
+    } catch (error) {
+        console.error('Error recording view:', error);
+    }
+    
+    // Handle next video navigation
     const nextVideo = document.querySelector('a[href^="/video/"]');
     if (nextVideo) {
         window.location.href = nextVideo.href;
     }
 });
 
+// Update like button handler to show error if already liked
 document.getElementById('likeButton').addEventListener('click', async function() {
     try {
         const response = await fetch(`/video/{{ video.slug }}/like`, {
             method: 'POST'
         });
         const data = await response.json();
-        document.getElementById('likeCount').textContent = `${data.likes} likes`;
+        
+        if (response.ok) {
+            document.getElementById('likeCount').textContent = `${data.likes} likes`;
+        } else {
+            // Show error message
+            alert(data.error || 'You can only like a video once');
+        }
     } catch (error) {
         console.error('Error liking video:', error);
     }
 });
 
+// Update comment form handler to show error if already commented
 document.getElementById('commentForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-    
-    const formData = new FormData(this);
-    const commentsList = document.getElementById('commentsList');
-    const noComments = document.getElementById('noComments');
     
     try {
         const response = await fetch(`/video/{{ video.slug }}/comment`, {
             method: 'POST',
-            body: formData
+            body: new FormData(this)
         });
         
         const data = await response.json();
-        if (data.success) {
+        
+        if (response.ok) {
+            // Add comment to list
+            const commentsList = document.getElementById('commentsList');
+            const noComments = document.getElementById('noComments');
+            
             // Remove "No comments yet" message if it exists
             if (noComments) {
                 noComments.remove();
@@ -209,6 +227,8 @@ document.getElementById('commentForm').addEventListener('submit', async function
             
             commentsList.insertBefore(newComment, commentsList.firstChild);
             this.reset();
+        } else {
+            alert(data.error || 'You can only comment once on this video');
         }
     } catch (error) {
         console.error('Error posting comment:', error);

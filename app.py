@@ -70,6 +70,10 @@ app.config.from_object('config')
 app.secret_key = os.urandom(24)
 app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2GB
 
+# Add session configuration
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+app.config['SESSION_TYPE'] = 'filesystem'
+
 # Configure Cloudinary
 cloudinary.config(
     cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
@@ -663,17 +667,21 @@ def like_video(slug):
         if not video:
             return jsonify({'error': 'Video not found'}), 404
             
-        if not hasattr(video, 'likes'):
-            video.likes = 0
-            
-        video.likes += 1
-        db_session.commit()
+        # Check if user already liked this video in this session
+        session_likes = session.get('video_likes', {})
+        if str(video.id) in session_likes:
+            return jsonify({'error': 'Already liked', 'likes': video.likes}), 400
         
+        video.likes += 1
+        session_likes[str(video.id)] = True
+        session['video_likes'] = session_likes
+        
+        db_session.commit()
         return jsonify({'success': True, 'likes': video.likes}), 200
     except Exception as e:
         logging.error(f"Error liking video: {str(e)}")
         db_session.rollback()
-        return jsonify({'error': 'Internal server error'}), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/video/<slug>/comment', methods=['POST'])
 def add_comment(slug):
@@ -681,6 +689,11 @@ def add_comment(slug):
         video = Video.query.filter_by(slug=slug).first()
         if not video:
             return jsonify({'error': 'Video not found'}), 404
+            
+        # Check if user already commented on this video in this session
+        session_comments = session.get('video_comments', {})
+        if str(video.id) in session_comments:
+            return jsonify({'error': 'Already commented on this video'}), 400
             
         comment_text = request.form.get('text', '').strip()
         if not comment_text:
@@ -697,17 +710,42 @@ def add_comment(slug):
             video.comments = []
             
         video.comments.append(comment_data)
-        db_session.commit()
+        session_comments[str(video.id)] = True
+        session['video_comments'] = session_comments
         
-        return jsonify({
-            'success': True,
-            'comment': comment_data
-        }), 200
+        db_session.commit()
+        return jsonify({'success': True, 'comment': comment_data}), 200
         
     except Exception as e:
         logging.error(f"Error adding comment: {str(e)}")
         db_session.rollback()
-        return jsonify({'error': 'Internal server error'}), 500
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/video/<slug>/view', methods=['POST'])
+def record_view(slug):
+    try:
+        video = Video.query.filter_by(slug=slug).first()
+        if not video:
+            return jsonify({'error': 'Video not found'}), 404
+            
+        # Create unique session key for this video view
+        session_id = session.get('session_id')
+        if not session_id:
+            session_id = secrets.token_hex(16)
+            session['session_id'] = session_id
+            
+        view_key = f'video_view_{video.id}_{session_id}'
+        
+        # Check if completed flag exists
+        if not session.get(view_key + '_completed'):
+            video.views += 1
+            db_session.commit()
+            session[view_key + '_completed'] = True
+            
+        return jsonify({'success': True, 'views': video.views}), 200
+    except Exception as e:
+        db_session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 def run_migration():
     """Run database migrations"""
