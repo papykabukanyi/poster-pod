@@ -1,0 +1,218 @@
+<!-- templates/video_player.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-100 dark:bg-gray-900">
+    <div class="container mx-auto px-4 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Main Video Column -->
+            <div class="lg:col-span-2">
+                <!-- Video Player -->
+                <div class="bg-black rounded-lg overflow-hidden">
+                    <video 
+                        id="mainVideo"
+                        class="w-full aspect-video"
+                        controls
+                        autoplay
+                        preload="auto"
+                    >
+                        <source src="{{ video.video_url }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+
+                <!-- Video Info -->
+                <div class="mt-4 bg-white dark:bg-gray-800 rounded-lg p-6">
+                    <!-- Title and Views -->
+                    <div class="flex items-center justify-between mb-4">
+                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                            {{ video.title }}
+                        </h1>
+                        <div class="flex items-center text-gray-600 dark:text-gray-400">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            <span>{{ video.views }} views</span>
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    <p class="text-gray-700 dark:text-gray-300">
+                        {{ video.description }}
+                    </p>
+
+                    <!-- Upload Date -->
+                    <div class="mt-4 text-sm text-gray-600 dark:text-gray-400">
+                        Uploaded {{ video.created_at|timeago }}
+                    </div>
+
+                    <div class="flex items-center space-x-4 mt-4">
+                        <button id="likeButton" class="flex items-center space-x-2 text-gray-600 hover:text-purple-500">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
+                            </svg>
+                            <span id="likeCount">{{ video.likes }} likes</span>
+                        </button>
+                    </div>
+
+                    <!-- Comments Section -->
+                    <div class="mt-8">
+                        <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Comments</h2>
+                        
+                        <!-- Comment Form -->
+                        <form id="commentForm" class="mb-6">
+                            <div class="mb-4">
+                                <input type="text" 
+                                       name="user" 
+                                       placeholder="Your name (optional)"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                            </div>
+                            <div class="mb-4">
+                                <textarea name="text" 
+                                          rows="3" 
+                                          required
+                                          placeholder="Write a comment..."
+                                          class="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"></textarea>
+                            </div>
+                            <button type="submit" 
+                                    class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700">
+                                Post Comment
+                            </button>
+                        </form>
+
+                        <!-- Comments List -->
+                        <div id="commentsList" class="space-y-4">
+                            {% if video.comments and video.comments|length > 0 %}
+                                {% for comment in video.comments %}
+                                <div class="flex space-x-3">
+                                    <div class="flex-1 bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                        <div class="flex items-center justify-between">
+                                            <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                                {{ comment.user }}
+                                            </div>
+                                            <div class="text-xs text-gray-500">
+                                                {{ comment.timestamp|timeago }}
+                                            </div>
+                                        </div>
+                                        <div class="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                                            {{ comment.text }}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p id="noComments" class="text-gray-500 dark:text-gray-400">No comments yet</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recommendations Column -->
+            <div class="lg:col-span-1">
+                <div class="bg-white dark:bg-gray-800 rounded-lg p-6">
+                    <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Up Next</h2>
+                    <div class="space-y-4">
+                        {% for rec in recommended %}
+                        <a href="{{ url_for('video_player', slug=rec.slug) }}" 
+                           class="flex space-x-4 group">
+                            <div class="flex-shrink-0 w-40 h-24 relative">
+                                <img src="{{ rec.thumbnail_url }}" 
+                                     alt="{{ rec.title }}" 
+                                     class="w-full h-full object-cover rounded-lg"/>
+                                {% if rec.duration %}
+                                <div class="absolute bottom-1 right-1 bg-black bg-opacity-75 px-1 rounded text-xs text-white">
+                                    {{ '%d:%02d'|format(rec.duration//60, rec.duration%60) }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-medium text-gray-900 dark:text-white group-hover:text-blue-500">
+                                    {{ rec.title }}
+                                </h3>
+                                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                    {{ rec.views }} views
+                                </p>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-play next video when current video ends
+document.getElementById('mainVideo').addEventListener('ended', function() {
+    const nextVideo = document.querySelector('a[href^="/video/"]');
+    if (nextVideo) {
+        window.location.href = nextVideo.href;
+    }
+});
+
+document.getElementById('likeButton').addEventListener('click', async function() {
+    try {
+        const response = await fetch(`/video/{{ video.slug }}/like`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+        document.getElementById('likeCount').textContent = `${data.likes} likes`;
+    } catch (error) {
+        console.error('Error liking video:', error);
+    }
+});
+
+document.getElementById('commentForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const commentsList = document.getElementById('commentsList');
+    const noComments = document.getElementById('noComments');
+    
+    try {
+        const response = await fetch(`/video/{{ video.slug }}/comment`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            // Remove "No comments yet" message if it exists
+            if (noComments) {
+                noComments.remove();
+            }
+
+            // Add new comment to list
+            const newComment = document.createElement('div');
+            newComment.className = 'flex space-x-3';
+            newComment.innerHTML = `
+                <div class="flex-1 bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm font-medium text-gray-900 dark:text-white">
+                            ${data.comment.user}
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            just now
+                        </div>
+                    </div>
+                    <div class="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                        ${data.comment.text}
+                    </div>
+                </div>
+            `;
+            
+            commentsList.insertBefore(newComment, commentsList.firstChild);
+            this.reset();
+        }
+    } catch (error) {
+        console.error('Error posting comment:', error);
+    }
+});
+</script>
+{% endblock %}

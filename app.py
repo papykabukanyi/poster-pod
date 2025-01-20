@@ -32,8 +32,30 @@ import logging
 from urllib.parse import urlencode
 from services.twitter_service import TwitterService
 import tweepy
-from datetime import datetime
+from datetime import datetime, timedelta
+import time  # Add this import
 from services.scheduler_service import SchedulerService
+from models.video import Video
+import mimetypes
+import tempfile
+
+# Add allowed video types
+ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv', 'webm'}
+ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+
+# Add to existing ALLOWED_VIDEO_EXTENSIONS
+ALLOWED_MIME_TYPES = {
+    'video/mp4', 'video/quicktime', 'video/x-msvideo',
+    'video/webm', 'video/x-matroska'
+}
+
+def allowed_video_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_VIDEO_EXTENSIONS
+
+def allowed_image_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
 
 # Add after imports
 logging.basicConfig(
@@ -46,18 +68,28 @@ logging.basicConfig(
 app = Flask(__name__)
 app.config.from_object('config')
 app.secret_key = os.urandom(24)
-app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB limit
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024  # 2GB
 
 # Configure Cloudinary
 cloudinary.config(
     cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
     api_key=os.getenv('CLOUDINARY_API_KEY'),
     api_secret=os.getenv('CLOUDINARY_API_SECRET'),
-    secure=True
+    secure=True,
+    api_proxy='http://proxy.server:3128'  # Add this line if you're behind a proxy
 )
 
 # Timeago filter
 def timeago(date):
+    if isinstance(date, str):
+        try:
+            date = datetime.fromisoformat(date.replace('Z', '+00:00'))
+        except:
+            return ''
+    
+    if not isinstance(date, datetime):
+        return ''
+        
     now = datetime.utcnow()
     diff = now - date
     
@@ -122,12 +154,9 @@ def index():
 
 @app.route('/admin')
 def admin():
-    try:
-        podcasts = Podcast.query.order_by(Podcast.created_at.desc()).all()
-        return render_template('admin.html', podcasts=podcasts)
-    except Exception as e:
-        print(f"Admin error: {e}")
-        return "Error loading admin page", 500
+    videos = Video.query.order_by(Video.created_at.desc()).all()
+    podcasts = Podcast.query.order_by(Podcast.created_at.desc()).all()
+    return render_template('admin.html', podcasts=podcasts, videos=videos)
 
 @app.route('/like/<int:podcast_id>', methods=['POST'])
 def like_podcast(podcast_id):
@@ -487,16 +516,220 @@ def twitter_auth():
         logging.error(f"Twitter auth error: {e}")
         return redirect(url_for('twitter_manager'))
 
+@app.route('/postervideo')
+def video_list():
+    try:
+        videos = Video.query.order_by(Video.created_at.desc()).all()
+        return render_template('postervideo.html', videos=videos)
+    except Exception as e:
+        logging.error(f"Error loading videos: {e}")
+        return "Error loading videos", 500
+
+@app.route('/video/<slug>')
+def video_player(slug):
+    try:
+        video = Video.query.filter_by(slug=slug).first()
+        if not video:
+            abort(404)
+            
+        # Increment views
+        video.views += 1
+        
+        # Get recommended videos
+        recommended = Video.query.filter(
+            Video.id != video.id
+        ).order_by(Video.views.desc()).limit(5).all()
+        
+        # Convert datetime to string for template
+        for rec in recommended:
+            if isinstance(rec.created_at, datetime):
+                rec.created_at_str = rec.created_at.isoformat()
+        
+        db_session.commit()
+        
+        return render_template(
+            'video_player.html', 
+            video=video,
+            recommended=recommended
+        )
+    except Exception as e:
+        logging.error(f"Error loading video player: {e}")
+        db_session.rollback()
+        return "Error loading video", 500
+
+@app.route('/api/search_videos')
+def search_videos():
+    query = request.args.get('q', '').strip()
+    try:
+        if (query):
+            videos = Video.query.filter(
+                Video.title.ilike(f'%{query}%')
+            ).limit(5).all()
+            return jsonify([video.to_dict() for video in videos])
+        return jsonify([])
+    except Exception as e:
+        logging.error(f"Search error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/upload/video', methods=['POST'])
+def upload_video():
+    if 'video' not in request.files:
+        return jsonify({'error': 'No video file uploaded'}), 400
+        
+    try:
+        video_file = request.files['video']
+        thumbnail_file = request.files['thumbnail']
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '').strip()
+
+        # Validation
+        if not title:
+            return jsonify({'error': 'Title is required'}), 400
+        if not video_file or not video_file.filename:
+            return jsonify({'error': 'Video file is required'}), 400
+        if not thumbnail_file or not thumbnail_file.filename:
+            return jsonify({'error': 'Thumbnail is required'}), 400
+
+        # Check file size
+        max_video_size = 500 * 1024 * 1024  # 500MB
+        if video_file.content_length > max_video_size:
+            return jsonify({
+                'error': f'Video file too large. Maximum size is {max_video_size/1024/1024}MB'
+            }), 400
+
+        # Upload video
+        try:
+            video_data = video_file.read()
+            video_result = uploader.upload(
+                video_data,
+                resource_type='video',
+                folder='videos',
+                eager=[
+                    {'quality': 'auto', 'format': 'mp4'},
+                    {'width': 720, 'crop': 'scale', 'quality': 'auto'}
+                ]
+            )
+        except Exception as e:
+            return jsonify({
+                'error': f'Video upload failed: {str(e)}'
+            }), 500
+
+        # Upload thumbnail
+        try:
+            thumbnail_data = thumbnail_file.read()
+            thumb_result = uploader.upload(
+                thumbnail_data,
+                folder='video_thumbnails',
+                transformation=[
+                    {'width': 720, 'crop': 'fill'},
+                    {'quality': 'auto'}
+                ]
+            )
+        except Exception as e:
+            return jsonify({
+                'error': f'Thumbnail upload failed: {str(e)}'
+            }), 500
+
+        # Create video record
+        video = Video(
+            title=title,
+            description=description,
+            video_url=video_result['secure_url'],
+            thumbnail_url=thumb_result['secure_url'],
+            duration=video_result.get('duration', 0),
+            cloudinary_public_id=video_result['public_id']
+        )
+        
+        db_session.add(video)
+        db_session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Video uploaded successfully',
+            'video': video.to_dict()
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Video upload error: {str(e)}")
+        db_session.rollback()
+        return jsonify({
+            'error': f'Video upload failed: {str(e)}'
+        }), 500
+
+@app.route('/video/<slug>/like', methods=['POST'])
+def like_video(slug):
+    try:
+        video = Video.query.filter_by(slug=slug).first()
+        if not video:
+            return jsonify({'error': 'Video not found'}), 404
+            
+        if not hasattr(video, 'likes'):
+            video.likes = 0
+            
+        video.likes += 1
+        db_session.commit()
+        
+        return jsonify({'success': True, 'likes': video.likes}), 200
+    except Exception as e:
+        logging.error(f"Error liking video: {str(e)}")
+        db_session.rollback()
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/video/<slug>/comment', methods=['POST'])
+def add_comment(slug):
+    try:
+        video = Video.query.filter_by(slug=slug).first()
+        if not video:
+            return jsonify({'error': 'Video not found'}), 404
+            
+        comment_text = request.form.get('text', '').strip()
+        if not comment_text:
+            return jsonify({'error': 'Comment text is required'}), 400
+            
+        comment_data = {
+            'id': secrets.token_hex(8),
+            'user': request.form.get('user', 'Anonymous'),
+            'text': comment_text,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        if not video.comments:
+            video.comments = []
+            
+        video.comments.append(comment_data)
+        db_session.commit()
+        
+        return jsonify({
+            'success': True,
+            'comment': comment_data
+        }), 200
+        
+    except Exception as e:
+        logging.error(f"Error adding comment: {str(e)}")
+        db_session.rollback()
+        return jsonify({'error': 'Internal server error'}), 500
+
 def run_migration():
     """Run database migrations"""
     try:
         with engine.connect() as connection:
+            # Create pgcrypto extension if not exists
+            connection.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto;"))
+            
             # Execute existing migrations
             with open('migrations/alter_news_articles.sql') as f:
                 connection.execute(text(f.read()))
             
-            # Execute new activity_logs migration
-            with open('migrations/add_activity_logs.sql') as f:
+            # Execute videos table migration
+            with open('migrations/add_videos_table.sql') as f:
+                connection.execute(text(f.read()))
+                
+            # Execute video slugs migration
+            with open('migrations/add_video_slugs.sql') as f:
+                connection.execute(text(f.read()))
+
+            # Execute video likes migration
+            with open('migrations/add_video_likes.sql') as f:
                 connection.execute(text(f.read()))
                 
             connection.commit()
@@ -508,6 +741,7 @@ def run_migration():
 def init_db():
     inspector = inspect(engine)
     try:
+        Base.metadata.create_all(bind=engine)
         run_migration()
         return True
     except Exception as e:

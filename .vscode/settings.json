@@ -1,3 +1,12 @@
 {
-    "mobile-preview.device": "iPhone 15 Pro Max"
+    "mobile-preview.device": "iPhone 15 Pro Max",
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "server": "localhost",
+            "driver": "PostgreSQL",
+            "connectString": "postgresql://postgres:PkiSFayTnRTkdMlwwmrLOINhrMfBlwdm@autorack.proxy.rlwy.net:58219/railway",
+            "name": "railposter"
+        }
+    ]
 }
