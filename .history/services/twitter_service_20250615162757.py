@@ -203,20 +203,44 @@ class TwitterService:
                 self._add_activity_log('error', "Post timed out")
                 return False
 
-            return False        except Exception as e:
+            return False
+
+        except Exception as e:
             logging.error(f"Twitter post error: {e}")
             self._add_activity_log('error', f"Post error: {str(e)}")
             return False
-            
+
     def _post_with_retries(self, text, article):
-        """Handle posting with retries in background - text only, no media"""
-        # Removed media_id handling - we only want text tweets
+        """Handle posting with retries in background"""
+        media_id = None
+        
+        # Handle image if available
+        if article.image_url and os.path.exists(article.image_url.lstrip('/')):
+            try:
+                watermarked_path = ImageService.add_watermark(
+                    article.image_url.lstrip('/'),
+                    "www.onposter.site/news"
+                )
+                if watermarked_path:
+                    media = self.v1_api.media_upload(watermarked_path)
+                    media_id = media.media_id
+                    try:
+                        os.remove(watermarked_path)
+                    except:
+                        pass
+            except Exception as e:
+                logging.error(f"Media upload error: {e}")
 
         # Post with retries
         for attempt in range(self.max_retries):
             try:
-                # Always post text-only tweets
-                response = self.client.create_tweet(text=text)
+                if media_id:
+                    response = self.client.create_tweet(
+                        text=text,
+                        media_ids=[media_id]
+                    )
+                else:
+                    response = self.client.create_tweet(text=text)
                     
                 if response.data:
                     self._add_activity_log('post', f"Posted: {text[:50]}...")

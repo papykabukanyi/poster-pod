@@ -203,12 +203,12 @@ class TwitterService:
                 self._add_activity_log('error', "Post timed out")
                 return False
 
-            return False        except Exception as e:
+            return False
+
+        except Exception as e:
             logging.error(f"Twitter post error: {e}")
             self._add_activity_log('error', f"Post error: {str(e)}")
-            return False
-            
-    def _post_with_retries(self, text, article):
+            return False    def _post_with_retries(self, text, article):
         """Handle posting with retries in background - text only, no media"""
         # Removed media_id handling - we only want text tweets
 

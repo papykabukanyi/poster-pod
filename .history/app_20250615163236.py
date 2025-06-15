@@ -269,10 +269,11 @@ def embed_podcast(podcast_id):
     try:
         podcast = Podcast.query.get(podcast_id)
         if not podcast:
-            abort(404)            
-            response = make_response(render_template('embed.html', podcast=podcast))
-            response.headers['X-Frame-Options'] = 'ALLOW-FROM *'
-            response.headers['Content-Security-Policy'] = "frame-ancestors 'self' *"
+            abort(404)
+            
+        response = make_response(render_template('embed.html', podcast=podcast))
+        response.headers['X-Frame-Options'] = 'ALLOW-FROM https://www.linkedin.com'
+        response.headers['Content-Security-Policy'] = "frame-ancestors 'self' https://www.linkedin.com https://platform.linkedin.com"
         return response
     except Exception as e:
         print(f"Error in embed_podcast: {e}")

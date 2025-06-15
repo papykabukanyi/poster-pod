@@ -132,7 +132,7 @@ class SchedulerService:
             try:
                 current_time = datetime.utcnow()
 
-                # News update (every 1 hour now)
+                # News update (every 2 hours)
                 try:
                     if not self.last_news_update or current_time >= self.next_news_update:
                         self.logger.info("Running scheduled news update")
@@ -142,44 +142,22 @@ class SchedulerService:
                             self.logger.info(f"News updated at {current_time}")
                 except Exception as e:
                     self.logger.error(f"News update error: {e}")
-                    # Even if there's an error, schedule next attempt
-                    if not self._next_news_update or current_time >= self._next_news_update:
-                        self._next_news_update = current_time + timedelta(minutes=15)  # Retry in 15 minutes
 
                 # Twitter post (every 30 minutes)
                 try:
                     if not self.last_twitter_update or current_time >= self.next_twitter_update:
                         cached_news = NewsService.get_cached_news()
-                        if cached_news:
-                            article = None
-                            # Try to use breaking news first
-                            if cached_news.get('breaking'):
-                                article = cached_news['breaking']
-                            # Fall back to other news if no breaking news
-                            elif cached_news.get('other') and len(cached_news['other']) > 0:
-                                article = cached_news['other'][0]
-                                
-                            if article:
-                                self.logger.info(f"Attempting Twitter post for article: {article.title if hasattr(article, 'title') else 'Unknown'}")
-                                if self.twitter_service.post_article(article):
-                                    self.last_twitter_update = current_time
-                                    self._next_twitter_update = current_time + timedelta(seconds=self.twitter_interval)
-                                    self.logger.info(f"Twitter post successful at {current_time}")
-                                else:
-                                    self.logger.warning("Twitter post failed, will retry in 15 minutes")
-                                    self._next_twitter_update = current_time + timedelta(minutes=15)
-                        else:
-                            self.logger.warning("No news available for Twitter post")
-                            # Force a news refresh
-                            NewsService.fetch_news(force_breaking=True)
+                        if cached_news and cached_news.get('breaking'):
+                            if self.twitter_service.post_article(cached_news['breaking']):
+                                self.last_twitter_update = current_time
+                                self._next_twitter_update = current_time + timedelta(seconds=self.twitter_interval)
+                                self.logger.info(f"Twitter post at {current_time}")
                 except tweepy.TooManyRequests as e:
-                    retry_after = int(e.response.headers.get('x-rate-limit-reset', 900)) 
+                    retry_after = int(e.response.headers.get('x-rate-limit-reset', 900))
                     self.logger.warning(f"Twitter rate limit hit, waiting {retry_after} seconds")
                     self._next_twitter_update = current_time + timedelta(seconds=retry_after)
                 except Exception as e:
                     self.logger.error(f"Twitter post error: {e}")
-                    # Schedule retry after a short delay
-                    self._next_twitter_update = current_time + timedelta(minutes=15)
 
                 # Cleanup (every 12 hours)
                 if (current_time - self.last_cleanup).total_seconds() >= self.cleanup_interval:
