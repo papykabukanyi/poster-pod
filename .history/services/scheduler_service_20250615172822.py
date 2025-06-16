@@ -8,6 +8,9 @@ import logging
 from datetime import datetime, timedelta
 import tweepy
 from services.image_service import ImageService
+# Import these at initialization to avoid circular imports
+# from services.news_service import NewsService
+# from services.twitter_service import TwitterService
 
 class SchedulerService:
     _instance = None
@@ -16,12 +19,10 @@ class SchedulerService:
     def get_instance(cls):
         if cls._instance is None:
             cls._instance = cls()
-        return cls._instance
-
-    def __init__(self):
-        self.news_interval = 3600  # 1 hour for news updates
-        self.twitter_interval = 1800  # 30 minutes for tweets
-        self.cleanup_interval = 43200  # 12 hours for cleanup
+        return cls._instance    def __init__(self):
+        self.news_interval = 3600  # Reduced from 7200 (2 hours) to 3600 (1 hour) to get more frequent news updates
+        self.twitter_interval = 1800  # 30 minutes in seconds
+        self.cleanup_interval = 43200  # 12 hours (unchanged)
         self.running = False
         self.thread = None
         
@@ -45,11 +46,8 @@ class SchedulerService:
     def initialize(self):
         """Initial fetch of news and Twitter post"""
         try:
-            # Import here to avoid circular imports
-            from services.news_service import NewsService
-            
             # Initial news fetch
-            if NewsService.fetch_news(force_breaking=True):
+            if NewsService.fetch_news(force_breaking=True):  # Using class method
                 self.last_news_update = datetime.utcnow()
                 self._next_news_update = self.last_news_update + timedelta(seconds=self.news_interval)
                 self.logger.info(f"Initial news fetch successful. Next update in {self.news_interval/3600} hours")
@@ -133,8 +131,6 @@ class SchedulerService:
     def run_scheduler(self):
         """Main scheduler loop"""
         self.initialize()  # Perform initial updates
-        
-        from services.news_service import NewsService
         
         while self.running:
             try:
