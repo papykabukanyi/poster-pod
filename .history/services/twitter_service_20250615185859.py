@@ -141,11 +141,12 @@ class TwitterService:
             
         except Exception as e:
             logging.error(f"Rate limit handling error: {e}")
-            return 60  # Default wait    def post_article(self, article):
+            return 60  # Default wait
+
+    def post_article(self, article):
         """Post article with adjusted timeouts"""
         try:
             if not self.client or not self.v1_api:
-                logging.error("Twitter clients not initialized")
                 return False
 
             current_time = datetime.utcnow()
@@ -153,24 +154,23 @@ class TwitterService:
             if self.last_post_time:
                 time_since_last = (current_time - self.last_post_time).total_seconds()
                 if time_since_last < self.post_interval:
-                    logging.info(f"Skipping post, last post was {time_since_last}s ago (interval: {self.post_interval}s)")
                     return False
 
-            # Generate tweet text
             text = self._generate_tweet_text(article)
-            logging.info(f"Prepared tweet text: {repr(text)}")
             
-            # Use direct posting instead of futures for reliability
+            # Use longer timeout for posting
+            future = self.executor.submit(
+                partial(self._post_with_retries, text=text, article=article)
+            )
+            
             try:
-                result = self._post_with_retries(text=text, article=article)
+                result = future.result(timeout=self.post_timeout)
                 if result:
                     self.last_post_time = current_time
                     return True
-                else:
-                    logging.warning("Post failed")
-                    return False
-            except Exception as e:
-                logging.error(f"Post error: {str(e)}")
+            except concurrent.futures.TimeoutError:
+                logging.error("Post timed out")
+                self._add_activity_log('error', "Post timed out")
                 return False
                 
         except Exception as e:

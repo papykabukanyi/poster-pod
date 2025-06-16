@@ -28,7 +28,7 @@ class NewsService:
     def __init__(self):
         self.last_update_time = None
         self.next_update_time = None
-        self.breaking_news_check_interval = 1800  # Reduced to 30 minutes for more frequent updates
+        self.breaking_news_check_interval = 3600  # Reduced from 7200 (2 hours) to 3600 (1 hour) for more frequent updates
         self.twitter_interval = 1800  # 30 minutes
         self.last_twitter_post = None
 
@@ -36,21 +36,22 @@ class NewsService:
     def get_instance(cls):
         if cls._instance is None:
             cls._instance = cls()
-        return cls._instance
-
-    @classmethod
+        return cls._instance    @classmethod
     def fetch_news(cls, force_breaking=False):
-        """Class method for fetching news with better error handling"""
+        """Class method for fetching news"""
         try:
             current_time = datetime.utcnow()
             
             # Check cache validity - but with forced refresh, always fetch
             if not force_breaking and cls._cache['last_fetch']:
                 time_since_cache = (current_time - cls._cache['last_fetch']).total_seconds()
-                if time_since_cache < 1800:  # 30 minutes
+                if time_since_cache < 1800:  # Reduced to 30 minutes for more frequent updates
                     logging.info("Using cached news")
                     return True
 
+            # Always clear cache when fetching new news
+            cls._cache['articles'] = None
+            
             # Set no-cache headers to avoid stale API responses
             headers = {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -58,121 +59,103 @@ class NewsService:
                 'Expires': '0'
             }
             
-            # Always add a timestamp to prevent caching
             params = {
                 'apikey': NEWSDATA_API_KEY,
                 'country': 'us,gb',
                 'language': 'en',
                 'category': 'top',
-                'size': 15,  # Get more articles to choose from
-                'timestamp': int(time.time())  # Prevent caching
+                'size': 15,  # Increase size to get more articles to choose from
+                '_': str(int(time.time()))  # Add timestamp to prevent caching
             }
             
             logging.info("Fetching fresh news from API")
-            try:
-                response = requests.get(
-                    'https://newsdata.io/api/1/news', 
-                    params=params, 
-                    headers=headers,
-                    timeout=15
-                )
-            except requests.exceptions.RequestException as e:
-                logging.error(f"News API request failed: {e}")
-                return False
-                
-            if response.status_code != 200:
-                logging.error(f"News API returned status code {response.status_code}")
-                return False
-                
-            try:
+            response = requests.get(
+                'https://newsdata.io/api/1/news', 
+                params=params, 
+                headers=headers,
+                timeout=15
+            )
+            
+            if response.status_code == 200:
                 data = response.json()
-            except ValueError:
-                logging.error("Failed to parse API response as JSON")
-                return False
+                articles = data.get('results', [])
                 
-            articles = data.get('results', [])
-            
-            if not articles:
-                logging.warning("News API returned no articles")
-                return False
-                
-            logging.info(f"Received {len(articles)} articles from news API")
-            
-            # Sort articles by published date (newest first)
-            sorted_articles = []
-            for article in articles:
-                try:
-                    if 'pubDate' in article and article.get('title') and article.get('link'):
-                        pub_date = datetime.fromisoformat(article['pubDate'].replace('Z', '+00:00'))
-                        sorted_articles.append((pub_date, article))
-                except (ValueError, TypeError) as e:
-                    logging.warning(f"Error parsing article date: {e}")
-                    
-            sorted_articles.sort(reverse=True)  # Sort by date, newest first
-            sorted_articles = [article for _, article in sorted_articles]
-            
-            if not sorted_articles:
-                logging.warning("No valid articles after sorting")
-                return False
-                
-            with db_session() as session:
-                try:
-                    # Clear old articles
-                    session.query(NewsArticle).delete()
-                    
-                    # Process breaking news - use the freshest article
-                    breaking_news = None
-                    if sorted_articles:
-                        breaking_news = cls._process_article(sorted_articles[0], is_breaking=True)
-                        if breaking_news:
-                            session.add(breaking_news)
-                            logging.info(f"Added breaking news: {breaking_news.title}")
-                        else:
-                            logging.warning("Failed to process breaking news article")
-                    
-                    # Process other news
-                    other_news = []
-                    seen_titles = set()
-                    
-                    if breaking_news:
-                        seen_titles.add(breaking_news.title)
-
-                    # Process up to 5 additional articles
-                    for article in sorted_articles[1:]:
-                        if len(other_news) >= 5:
-                            break
-                            
-                        title = article.get('title', '')
-                        if title and title not in seen_titles:
-                            seen_titles.add(title)
-                            news_article = cls._process_article(article)
-                            if news_article:
-                                other_news.append(news_article)
-                                logging.info(f"Added regular news: {news_article.title}")
-
-                    session.add_all(other_news)
-                    session.commit()
-
-                    # Update cache with correct counts
-                    cls._cache.update({
-                        'articles': {
-                            'breaking': breaking_news,
-                            'other': other_news
-                        },
-                        'breaking': breaking_news,
-                        'other': other_news,
-                        'last_fetch': current_time,
-                        'next_update': current_time + timedelta(seconds=1800),  # 30 minutes
-                        'total': len(other_news) + (1 if breaking_news else 0)
-                    })
-
-                    logging.info(f"Updated news at {current_time}, total articles: {len(other_news) + (1 if breaking_news else 0)}")
-                    return True
-                    
-                except Exception as e:
-                    logging.error(f"Database error when saving news: {e}")
-                    session.rollback()
+                if not articles:
+                    logging.warning("News API returned no articles")
                     return False
+                    
+                logging.info(f"Received {len(articles)} articles from news API")
+                
+                if articles:                with db_session() as session:
+                        # Clear old articles
+                        session.query(NewsArticle).delete()
+                        
+                        # Process breaking news - use the freshest article
+                        # Sort by published date
+                        breaking_news = None
+                        try:
+                            sorted_articles = sorted(
+                                articles, 
+                                key=lambda a: datetime.fromisoformat(a['pubDate'].replace('Z', '+00:00')) if 'pubDate' in a else datetime.min,
+                                reverse=True  # Most recent first
+                            )
+                            
+                            if sorted_articles:
+                                breaking_news = cls._process_article(sorted_articles[0], is_breaking=True)
+                                if breaking_news:
+                                    session.add(breaking_news)
+                                    logging.info(f"Added breaking news: {breaking_news.title}")
+                                else:
+                                    logging.warning("Failed to process breaking news article")
+                        except Exception as e:
+                            logging.error(f"Error processing breaking news: {str(e)}")
+                            breaking_news = None
+                        
+                        # Process other news
+                        other_news = []
+                        seen_titles = set()
+                        
+                        if breaking_news:
+                            seen_titles.add(breaking_news.title)
+
+                        try:
+                            # Process up to 6 total articles (1 breaking + 5 others)
+                            for article in articles:
+                                if len(other_news) >= 5:  # Stop after getting 5 additional articles
+                                    break
+                                    
+                                title = article.get('title', '')
+                                if title and title not in seen_titles:
+                                    seen_titles.add(title)
+                                    news_article = cls._process_article(article)
+                                    if news_article:
+                                        other_news.append(news_article)
+                                        logging.info(f"Added regular news: {news_article.title}")
+                        except Exception as e:
+                            logging.error(f"Error processing regular news: {str(e)}")
+
+                        session.add_all(other_news)
+                        session.commit()
+
+                        # Update cache with correct counts
+                        cls._cache.update({
+                            'articles': {
+                                'breaking': breaking_news,
+                                'other': other_news
+                            },
+                            'breaking': breaking_news,
+                            'other': other_news,
+                            'last_fetch': current_time,
+                            'next_update': current_time + timedelta(seconds=3600),  # Reduced to 1 hour
+                            'total': len(other_news) + (1 if breaking_news else 0)  # Add total count
+                        })
+
+                        logging.info(f"Updated news at {current_time}, total articles: {len(other_news) + (1 if breaking_news else 0)}")
+                        return True
+            else:
+                logging.error(f"News API returned status code {response.status_code}")
+            
+            return False
 
         except Exception as e:
             logging.error(f"Error fetching news: {e}")
@@ -255,42 +238,24 @@ class NewsService:
 
     @classmethod
     def get_cached_news(cls):
-        """Get cached news with a fallback to database if needed"""
         instance = cls.get_instance()
         try:
             current_time = datetime.utcnow()
             
-            # Return cache if valid and not empty
-            if (cls._cache['articles'] and 
-                cls._cache['articles'].get('breaking') and 
-                cls._cache.get('next_update') and
-                current_time < cls._cache['next_update']):
-                logging.info("Using cached news articles")
-                return cls._cache['articles']
+            # Return cache if valid
+            if cls._cache['articles'] and cls._cache.get('next_update'):
+                if current_time < cls._cache['next_update']:
+                    return cls._cache['articles']
             
-            # Cache invalid or empty, so get from database
-            logging.info("Cache invalid, getting news from database")
+            # Get from database
             with db_session() as session:
                 breaking_news = session.query(NewsArticle).filter_by(is_breaking=True)\
                                     .order_by(NewsArticle.published_at.desc())\
                                     .first()
                 other_news = session.query(NewsArticle).filter_by(is_breaking=False)\
                                   .order_by(NewsArticle.published_at.desc())\
-                                  .limit(5)\
+                                  .limit(3)\
                                   .all()
-                
-                if not breaking_news and not other_news:
-                    logging.warning("No news articles in database, triggering refresh")
-                    # Try to fetch fresh news
-                    if cls.fetch_news(force_breaking=True):
-                        # Try again from database
-                        breaking_news = session.query(NewsArticle).filter_by(is_breaking=True)\
-                                        .order_by(NewsArticle.published_at.desc())\
-                                        .first()
-                        other_news = session.query(NewsArticle).filter_by(is_breaking=False)\
-                                      .order_by(NewsArticle.published_at.desc())\
-                                      .limit(5)\
-                                      .all()
                 
                 articles = {
                     'breaking': breaking_news,

@@ -124,12 +124,11 @@ class SchedulerService:
             # Save image
             with open(filepath, 'wb') as f:
                 f.write(image_bytes)
-                  return filepath
+                
+            return filepath
         except Exception as e:
             self.logger.error(f"Error handling base64 image: {e}")
-            return None
-            
-    def run_scheduler(self):
+            return None    def run_scheduler(self):
         """Main scheduler loop"""
         self.initialize()  # Perform initial updates
         
